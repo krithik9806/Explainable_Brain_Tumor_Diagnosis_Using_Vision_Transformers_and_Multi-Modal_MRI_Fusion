@@ -1,0 +1,63 @@
+# ==============================================================================
+# Base Configuration for Vision Transformer Brain Tumor Diagnosis
+# ==============================================================================
+# Shared default configuration across all experiments (Kaggle single-modality & BraTS multi-modal fusion).
+# Experiment-specific config files (kaggle_config.yaml, brats_fusion_config.yaml) reference this file
+# via `base_config: configs/base_config.yaml` and override specific fields as needed.
+
+# Meta experiment identifiers
+experiment_name: "base_experiment"  # General experiment tag (overridden in specific configs)
+
+# Dataset configuration defaults
+dataset:
+  name: "base_dataset"  # Dataset identifier (overridden in specific configs)
+  raw_data_path: "data/raw"  # Relative path to raw dataset root directory
+  processed_data_path: "data/processed"  # Relative path where preprocessed slices/tensors are saved
+  num_classes: 2  # Default number of target classification categories (default, revisit during tuning)
+  class_names: []  # List of string labels corresponding to output logits (overridden in specific configs)
+  input_channels: 3  # Number of input channels expected by the data loader (1 or 3 for single-modality, 4 for BraTS fusion)
+  image_size: [224, 224]  # Target spatial height and width [H, W] for model input per README specification
+
+# Vision Transformer Model architecture configuration
+model:
+  backbone: "swin_tiny_patch4_window7_224"  # Default Swin Transformer backbone from timm library
+  pretrained: true  # Whether to initialize backbone with ImageNet pretrained weights for transfer learning
+  input_channel_override: null  # Number of input channels if modifying patch embedding stem (e.g. 4 for BraTS fusion, null if standard 3-channel stem)
+
+# Hyperparameters for model training
+training:
+  batch_size: 32  # Number of samples per training batch (default, revisit during tuning based on GPU VRAM)
+  num_epochs: 50  # Maximum number of training epochs (default, revisit during tuning)
+  optimizer: "adamw"  # Optimization algorithm ("adamw" per README specification)
+  learning_rate: 0.0001  # Initial learning rate for AdamW optimizer (default, revisit during tuning)
+  lr_scheduler: "cosine"  # Learning rate decay schedule ("cosine" decay per README specification)
+  weight_decay: 0.01  # L2 regularization weight decay factor for AdamW to prevent overfitting (default, revisit during tuning)
+  loss_function: "cross_entropy"  # Loss metric used during training ("cross_entropy" for multi-class classification)
+
+# Data augmentation pipeline settings
+augmentation:
+  flip_prob: 0.5  # Probability of applying horizontal/vertical random flips (default, revisit during tuning)
+  rotation_degrees: 15  # Maximum angle range (+/- degrees) for random spatial rotations (default, revisit during tuning)
+  elastic_deformation:
+    enabled: true  # Toggle flag to enable elastic transformation for simulating anatomical variance per README
+    alpha: 34.0  # Elastic deformation scaling factor alpha governing intensity of distortion (default, revisit during tuning)
+    sigma: 4.0  # Elastic deformation Gaussian smoothing standard deviation sigma (default, revisit during tuning)
+
+# Dataset splitting and random seeding for reproducibility
+splits:
+  train: 0.70  # Proportion of total data allocated to the training split (70%)
+  val: 0.15  # Proportion of total data allocated to the validation split (15%)
+  test: 0.15  # Proportion of total data allocated to the test split (15%)
+  random_seed: 42  # Global random seed for reproducible train/val/test splits and weight initialization
+  patient_level: true  # Flag indicating whether data splitting is performed at patient level to avoid slice-level data leakage
+
+# Model checkpointing and serialization settings
+checkpointing:
+  save_dir: "checkpoints/"  # Directory where model weights, optimizer states, and training metrics are saved
+  save_every_n_epochs: 5  # Frequency (in epochs) at which regular checkpoint snapshots are saved
+  metric_to_monitor: "val_loss"  # Metric name used for tracking and identifying the best-performing model checkpoint
+
+# Experiment tracking and logging setup
+logging:
+  wandb_project_name: "explainable-brain-tumor-diagnosis"  # Weights & Biases project identifier
+  log_every_n_steps: 10  # Frequency (in batch steps) at which loss and accuracy metrics are logged

@@ -1,0 +1,66 @@
+# ==============================================================================
+# Experiment 1: Kaggle Single-Modality 4-Class Brain Tumor Classification
+# ==============================================================================
+# This configuration defines Experiment 1: 4-class tumor classification (glioma, meningioma,
+# notumor, pituitary) using 2D single T1-weighted MRI images loaded as 3-channel (RGB) inputs
+# into a Swin Transformer architecture.
+
+# Reference to the base configuration file for default values
+base_config: "configs/base_config.yaml"  # Path to shared base defaults file to merge with
+
+# Meta experiment identifier for Experiment 1
+experiment_name: "kaggle_single_modality_swin"  # Unique experiment name for logging and checkpoint naming
+
+# Dataset configuration for Kaggle MRI 4-class classification
+dataset:
+  name: "kaggle_brain_mri"  # Dataset identifier name
+  raw_data_path: "data/raw/kaggle"  # Path to raw downloaded Kaggle image folders (Training/ Testing/)
+  processed_data_path: "data/processed/kaggle"  # Path for output processed 2D slice tensors
+  num_classes: 4  # Number of output classes (glioma, meningioma, notumor, pituitary)
+  class_names: ["glioma", "meningioma", "notumor", "pituitary"]  # Class label names matching Kaggle subfolder structure
+  input_channels: 3  # Input channels (3 for RGB-loaded grayscale 2D slice images)
+  image_size: [224, 224]  # Spatial resolution [H, W] required by Swin Transformer input stem per README
+
+# Model architecture settings for single-modality Swin Transformer
+model:
+  backbone: "swin_tiny_patch4_window7_224"  # Swin-Tiny backbone architecture with 4x4 patch size and 7x7 window size
+  pretrained: true  # Load ImageNet-1k pretrained weights for effective transfer learning
+  input_channel_override: null  # Standard 3-channel input stem used (no channel override required)
+
+# Hyperparameters for single-modality training
+training:
+  batch_size: 32  # Number of samples per batch (default, revisit during tuning based on GPU VRAM)
+  num_epochs: 50  # Total training epochs (default, revisit during tuning)
+  optimizer: "adamw"  # AdamW optimizer with decoupled weight decay per README specification
+  learning_rate: 0.0001  # Base learning rate for Swin Transformer fine-tuning (default, revisit during tuning)
+  lr_scheduler: "cosine"  # Cosine annealing learning rate decay schedule per README specification
+  weight_decay: 0.01  # Weight decay regularization coefficient (default, revisit during tuning)
+  loss_function: "cross_entropy"  # Multi-class Cross-Entropy loss function
+
+# Data augmentation pipeline options matching README specification
+augmentation:
+  flip_prob: 0.5  # Probability of horizontal/vertical random flipping (default, revisit during tuning)
+  rotation_degrees: 15  # Maximum angle (+/- 15 degrees) for random axial rotation (default, revisit during tuning)
+  elastic_deformation:
+    enabled: true  # Enable elastic deformation augmentation to simulate MRI tissue distortion
+    alpha: 34.0  # Distortion scale parameter alpha (default, revisit during tuning)
+    sigma: 4.0  # Gaussian filter standard deviation sigma (default, revisit during tuning)
+
+# Dataset splitting settings
+splits:
+  train: 0.70  # Train set ratio (70%)
+  val: 0.15  # Validation set ratio (15%)
+  test: 0.15  # Test set ratio (15%)
+  random_seed: 42  # Seed for reproducible random dataset splitting
+  patient_level: false  # False for Kaggle slice dataset as scans are isolated 2D images without patient IDs
+
+# Model checkpoint saving settings
+checkpointing:
+  save_dir: "checkpoints/kaggle"  # Subfolder inside checkpoints/ dedicated to Kaggle experiment outputs
+  save_every_n_epochs: 5  # Save intermediate weights every 5 epochs
+  metric_to_monitor: "val_loss"  # Validation metric used to select best checkpoint file
+
+# Experiment tracking and W&B logging options
+logging:
+  wandb_project_name: "explainable-brain-tumor-diagnosis"  # W&B project board name
+  log_every_n_steps: 10  # Step interval for logging training loss and mini-batch metrics

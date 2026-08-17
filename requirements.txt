@@ -1,0 +1,27 @@
+# Deep Learning & Vision Models
+torch>=2.0.0
+torchvision
+timm>=0.9.0
+
+# Data Processing & Numerics
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.2.0
+
+# Medical & Image Handling
+opencv-python>=4.7.0
+nibabel>=5.1.0
+SimpleITK>=2.2.0
+albumentations>=1.3.0
+
+# Visualization & Explainability
+matplotlib>=3.7.0
+seaborn>=0.12.0
+grad-cam>=1.4.8
+
+# Application & Configuration
+streamlit>=1.25.0
+pyyaml>=6.0
+
+# Experiment Tracking
+wandb>=0.15.0

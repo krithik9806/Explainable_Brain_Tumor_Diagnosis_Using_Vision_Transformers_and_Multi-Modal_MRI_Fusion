@@ -1,0 +1,66 @@
+# ==============================================================================
+# Experiment 2: BraTS Multi-Modal MRI Fusion Binary Classification (HGG vs LGG)
+# ==============================================================================
+# This configuration defines Experiment 2: Binary classification (High-Grade Glioma vs. Low-Grade Glioma)
+# using 4 co-registered MRI sequences (T1, T1ce, T2, FLAIR) stacked into a 4-channel input tensor
+# (early fusion) fed into a modified Swin Transformer backbone.
+
+# Reference to the base configuration file for default values
+base_config: "configs/base_config.yaml"  # Path to shared base defaults file to merge with
+
+# Meta experiment identifier for Experiment 2
+experiment_name: "brats_multimodal_fusion_swin"  # Unique experiment name for multi-modal fusion run
+
+# Dataset configuration for BraTS 2020 4-channel multi-modal fusion
+dataset:
+  name: "brats2020_fusion"  # Dataset identifier name
+  raw_data_path: "data/raw/brats"  # Path to raw BraTS dataset directory containing NIfTI files and name_mapping.csv
+  processed_data_path: "data/processed/brats"  # Path for preprocessed and fused 4-channel MRI slice tensors
+  num_classes: 2  # Binary classification target (0: LGG, 1: HGG)
+  class_names: ["LGG", "HGG"]  # Target tumor grade names derived from name_mapping.csv
+  input_channels: 4  # 4 channels: T1, T1ce, T2, FLAIR early fusion stack
+  image_size: [224, 224]  # Spatial resolution [H, W] per slice per README specification
+
+# Model architecture settings for 4-channel Swin Transformer
+model:
+  backbone: "swin_tiny_patch4_window7_224"  # Swin-Tiny architecture backbone (or swin_base_patch4_window7_224)
+  pretrained: true  # Initialize backbones with pretrained weights (stem weights inflated for 4th channel)
+  input_channel_override: 4  # Overrides Swin patch embedding layer stem to accept 4 channels instead of 3
+
+# Hyperparameters for multi-modal fusion training
+training:
+  batch_size: 16  # Batch size reduced to 16 to accommodate higher memory footprint of 4-channel tensors (default, revisit during tuning)
+  num_epochs: 50  # Total training epochs (default, revisit during tuning)
+  optimizer: "adamw"  # AdamW optimizer per README specification
+  learning_rate: 0.0001  # Initial learning rate (default, revisit during tuning)
+  lr_scheduler: "cosine"  # Cosine learning rate schedule per README specification
+  weight_decay: 0.01  # Weight decay regularization coefficient (default, revisit during tuning)
+  loss_function: "cross_entropy"  # Binary / Multi-class Cross-Entropy loss function
+
+# Data augmentation pipeline settings applied synchronously across all 4 channels
+augmentation:
+  flip_prob: 0.5  # Synchronous random flipping across all 4 MRI modalities (default, revisit during tuning)
+  rotation_degrees: 15  # Synchronous random rotation across all 4 modalities (default, revisit during tuning)
+  elastic_deformation:
+    enabled: true  # Synchronous elastic deformation for multi-modal tissue elasticity simulation
+    alpha: 34.0  # Elastic deformation magnitude factor alpha (default, revisit during tuning)
+    sigma: 4.0  # Gaussian filter standard deviation sigma (default, revisit during tuning)
+
+# Dataset splitting settings with strict patient-level separation
+splits:
+  train: 0.70  # Train set ratio (70%)
+  val: 0.15  # Validation set ratio (15%)
+  test: 0.15  # Test set ratio (15%)
+  random_seed: 42  # Seed for reproducible random patient partitioning
+  patient_level: true  # TRUE to enforce patient-level splitting to prevent slice-level data leakage across splits
+
+# Model checkpoint saving settings
+checkpointing:
+  save_dir: "checkpoints/brats_fusion"  # Subfolder inside checkpoints/ dedicated to BraTS fusion experiment outputs
+  save_every_n_epochs: 5  # Save intermediate weights every 5 epochs
+  metric_to_monitor: "val_loss"  # Metric monitored for identifying the best checkpoint
+
+# Experiment tracking and W&B logging options
+logging:
+  wandb_project_name: "explainable-brain-tumor-diagnosis"  # W&B project board name
+  log_every_n_steps: 10  # Step interval for logging metrics

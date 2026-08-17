@@ -1,0 +1,7 @@
+# Configuration parameters for Swin Transformer Training Pipeline
+#
+# Intended Purpose (from README.md):
+# - Configure dataset paths (data/raw, data/processed)
+# - Specify model backbone (swin_tiny / swin_base), input channels (4-channel multi-modal), num_classes (4)
+# - Define training hyperparameters (batch_size, learning_rate, epochs, optimizer, scheduler)
+# - Set experiment tracking parameters (wandb project name, run parameters, checkpoint save directory)
