@@ -1,0 +1,11 @@
+patient_id,grade,z_index,has_tumor,file_path,split,final_file_path
+BraTS20_Training_368,HGG,73,1,data/processed/brats_normalized/BraTS20_Training_368/slice_073.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_073.npz
+BraTS20_Training_368,HGG,74,1,data/processed/brats_normalized/BraTS20_Training_368/slice_074.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_074.npz
+BraTS20_Training_368,HGG,75,1,data/processed/brats_normalized/BraTS20_Training_368/slice_075.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_075.npz
+BraTS20_Training_368,HGG,76,1,data/processed/brats_normalized/BraTS20_Training_368/slice_076.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_076.npz
+BraTS20_Training_368,HGG,77,1,data/processed/brats_normalized/BraTS20_Training_368/slice_077.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_077.npz
+BraTS20_Training_368,HGG,78,1,data/processed/brats_normalized/BraTS20_Training_368/slice_078.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_078.npz
+BraTS20_Training_368,HGG,79,1,data/processed/brats_normalized/BraTS20_Training_368/slice_079.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_079.npz
+BraTS20_Training_368,HGG,80,1,data/processed/brats_normalized/BraTS20_Training_368/slice_080.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_080.npz
+BraTS20_Training_368,HGG,81,1,data/processed/brats_normalized/BraTS20_Training_368/slice_081.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_081.npz
+BraTS20_Training_368,HGG,82,1,data/processed/brats_normalized/BraTS20_Training_368/slice_082.npz,train,data/processed/test_subset/brats/train/BraTS20_Training_368/slice_082.npz

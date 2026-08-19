@@ -1,0 +1,11 @@
+filename,class_name,original_folder,file_path,split,final_file_path
+Tr-pi_135.npz,pituitary,Training,processed/kaggle_normalized/Training/pituitary/Tr-pi_135.npz,train,data/processed/test_subset/kaggle/train/pituitary/Tr-pi_135.npz
+Tr-no_154.npz,notumor,Training,processed/kaggle_normalized/Training/notumor/Tr-no_154.npz,train,data/processed/test_subset/kaggle/train/notumor/Tr-no_154.npz
+Tr-gl_365.npz,glioma,Training,processed/kaggle_normalized/Training/glioma/Tr-gl_365.npz,train,data/processed/test_subset/kaggle/train/glioma/Tr-gl_365.npz
+Tr-pi_125.npz,pituitary,Training,processed/kaggle_normalized/Training/pituitary/Tr-pi_125.npz,train,data/processed/test_subset/kaggle/train/pituitary/Tr-pi_125.npz
+Tr-gl_433.npz,glioma,Training,processed/kaggle_normalized/Training/glioma/Tr-gl_433.npz,train,data/processed/test_subset/kaggle/train/glioma/Tr-gl_433.npz
+Tr-no_389.npz,notumor,Training,processed/kaggle_normalized/Training/notumor/Tr-no_389.npz,train,data/processed/test_subset/kaggle/train/notumor/Tr-no_389.npz
+Tr-no_688.npz,notumor,Training,processed/kaggle_normalized/Training/notumor/Tr-no_688.npz,train,data/processed/test_subset/kaggle/train/notumor/Tr-no_688.npz
+Tr-no_1100.npz,notumor,Training,processed/kaggle_normalized/Training/notumor/Tr-no_1100.npz,train,data/processed/test_subset/kaggle/train/notumor/Tr-no_1100.npz
+Tr-aug-me_97.npz,meningioma,Training,processed/kaggle_normalized/Training/meningioma/Tr-aug-me_97.npz,train,data/processed/test_subset/kaggle/train/meningioma/Tr-aug-me_97.npz
+Tr-me_852.npz,meningioma,Training,processed/kaggle_normalized/Training/meningioma/Tr-me_852.npz,train,data/processed/test_subset/kaggle/train/meningioma/Tr-me_852.npz

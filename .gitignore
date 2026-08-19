@@ -1,4 +1,4 @@
-# Python virtual environment
+# Python virtual environments
 venv/
 env/
 ENV/
@@ -10,13 +10,10 @@ __pycache__/
 *$py.class
 
 # Data & Checkpoints
-data/raw/
-data/processed/
-!data/processed/.gitkeep
-checkpoints/*.pth
-checkpoints/*.pt
-checkpoints/*.ckpt
-!checkpoints/.gitkeep
+checkpoints/
+*.pth
+*.pt
+*.ckpt
 
 # Logs and tracking
 wandb/
@@ -29,3 +26,6 @@ tensorboard/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Large dataset archive - stored separately as a GitHub Release asset
+brats_slices.zip

@@ -25,3 +25,7 @@ pyyaml>=6.0
 
 # Experiment Tracking
 wandb>=0.15.0
+
+# Optional Dependencies
+# hd-bet  # optional — only needed if processing new raw MRI data
+

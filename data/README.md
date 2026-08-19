@@ -87,3 +87,11 @@ data/raw/brats/
 ### Data Quality & Anomaly Notes
 - **`BraTS20_Training_355`**: Segmentation mask is named `W39_1998.09.19_Segm.nii` instead of `BraTS20_Training_355_seg.nii`. Ingestion scripts must support this alias when loading segmentation volumes.
 
+---
+
+## 3. Preprocessing & Skull-Stripping Note
+
+> [!NOTE]
+> BraTS data is distributed pre-skull-stripped, so this step was skipped for the current pipeline; the function (`src/preprocessing/skull_strip.py`) exists for reusability if raw/new MRI data is added later.
+
+
