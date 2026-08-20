@@ -9,6 +9,7 @@ from src.fusion.fusion import (
     pass_through_kaggle,
     get_fusion_module,
 )
+from src.fusion.late_fusion import LateFusionModule
 
 __all__ = [
     "BraTSEarlyFusion",
@@ -16,4 +17,5 @@ __all__ = [
     "fuse_brats_modalities",
     "pass_through_kaggle",
     "get_fusion_module",
+    "LateFusionModule",
 ]
