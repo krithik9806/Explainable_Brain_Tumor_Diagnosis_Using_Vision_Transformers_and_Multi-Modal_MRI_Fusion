@@ -1,9 +1,13 @@
 """
-Pretrained Swin Transformer Backbone & Stem Adaptation Module.
+Pretrained Swin Transformer Backbone & Classification Model.
 
-This module loads ImageNet-pretrained Swin Transformer backbones via `timm` and adapts the initial
-patch embedding stem layer (`patch_embed.proj`) to support variable input channel counts (e.g., 4-channel
-BraTS multi-modal early fusion stacks [T1, T1ce, T2, FLAIR] or 3-channel single-modality Kaggle images).
+This module provides:
+1. Stem Adaptation (`adapt_input_stem`): Modifies the patch embedding projection stem (`patch_embed.proj`)
+   to support variable input channel counts (3 for Kaggle single-modality images, 4 for BraTS early fusion).
+2. Backbone Extractor (`SwinBackbone`): Feature extractor outputting raw embeddings [B, num_features].
+3. Classification Head (`ClassificationHead`): LayerNorm -> Dropout -> Linear head.
+4. Unified Classifier (`SwinClassifier`): End-to-end model combining Swin backbone and custom head to produce
+   logits [B, num_classes].
 
 Stem Adaptation Weight Rationale:
 --------------------------------
@@ -41,11 +45,9 @@ def adapt_input_stem(model: nn.Module, input_channels: int = 4) -> nn.Module:
     old_proj = model.patch_embed.proj
     old_in_chans = old_proj.in_channels
 
-    # If input channel count already matches, no stem modification required
     if old_in_chans == input_channels:
         return model
 
-    # Extract original projection parameters
     out_channels = old_proj.out_channels
     kernel_size = old_proj.kernel_size
     stride = old_proj.stride
@@ -53,7 +55,6 @@ def adapt_input_stem(model: nn.Module, input_channels: int = 4) -> nn.Module:
     dilation = old_proj.dilation
     bias_flag = old_proj.bias is not None
 
-    # Create new Conv2d layer with adapted input channels
     new_proj = nn.Conv2d(
         in_channels=input_channels,
         out_channels=out_channels,
@@ -64,28 +65,23 @@ def adapt_input_stem(model: nn.Module, input_channels: int = 4) -> nn.Module:
         bias=bias_flag,
     )
 
-    # Initialize weights
     with torch.no_grad():
         old_weight = old_proj.weight  # Shape: [out_channels, old_in_chans, K_h, K_w]
         new_weight = new_proj.weight  # Shape: [out_channels, input_channels, K_h, K_w]
 
-        # Copy over pretrained weights for shared channel indices
         min_chans = min(old_in_chans, input_channels)
         new_weight[:, :min_chans, :, :] = old_weight[:, :min_chans, :, :]
 
-        # If expanding channels (e.g., from 3 RGB channels to 4 MRI modalities):
         if input_channels > old_in_chans:
             # RATIONALE: Initialize the 4th channel (FLAIR) with the average of pretrained RGB weights
             # to preserve scale matching and pretrained spatial frequency filters.
-            mean_weight = old_weight.mean(dim=1, keepdim=True)  # Shape: [out_channels, 1, K_h, K_w]
+            mean_weight = old_weight.mean(dim=1, keepdim=True)
             for extra_idx in range(old_in_chans, input_channels):
                 new_weight[:, extra_idx : extra_idx + 1, :, :] = mean_weight
 
-        # Copy bias if present
         if bias_flag and old_proj.bias is not None:
             new_proj.bias.copy_(old_proj.bias)
 
-    # Replace stem layer in Swin Transformer model
     model.patch_embed.proj = new_proj
     if hasattr(model.patch_embed, "in_chans"):
         model.patch_embed.in_chans = input_channels
@@ -108,19 +104,11 @@ class SwinBackbone(nn.Module):
         pretrained: bool = True,
         drop_rate: float = 0.0,
     ):
-        """
-        Args:
-            backbone_name (str): Backbone architecture name in `timm`.
-            input_channels (int): Number of input channels (e.g., 4 for BraTS early fusion, 3 for Kaggle).
-            pretrained (bool): Whether to load ImageNet pretrained weights.
-            drop_rate (float): Dropout probability rate.
-        """
         super().__init__()
         self.backbone_name = backbone_name
         self.input_channels = input_channels
         self.pretrained = pretrained
 
-        # Load backbone with num_classes=0 to detach classification head
         self.backbone = timm.create_model(
             backbone_name,
             pretrained=pretrained,
@@ -128,27 +116,15 @@ class SwinBackbone(nn.Module):
             drop_rate=drop_rate,
         )
 
-        # Record initial parameter count before stem modification
         self.initial_param_count = sum(p.numel() for p in self.backbone.parameters())
 
-        # Adapt input stem if channel count differs from standard 3-channel RGB
         if input_channels != 3:
             adapt_input_stem(self.backbone, input_channels=input_channels)
 
-        # Record final parameter count after stem adaptation
         self.num_parameters = sum(p.numel() for p in self.backbone.parameters())
         self.num_features = self.backbone.num_features  # 768 for swin_tiny
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass producing feature embeddings.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape [B, C, H, W] where C is `input_channels`.
-
-        Returns:
-            torch.Tensor: Feature embeddings of shape [B, num_features] (e.g., [B, 768]).
-        """
         if x.ndim != 4:
             raise ValueError(f"Expected 4D input tensor [B, C, H, W], got shape {x.shape}")
         if x.shape[1] != self.input_channels:
@@ -160,27 +136,138 @@ class SwinBackbone(nn.Module):
         return features
 
 
+class ClassificationHead(nn.Module):
+    """
+    Custom classification head for Swin Transformer models.
+
+    Architecture:
+        LayerNorm(in_features) -> Dropout(drop_rate) -> Linear(in_features, num_classes)
+    """
+
+    def __init__(self, in_features: int, num_classes: int, drop_rate: float = 0.2):
+        """
+        Args:
+            in_features (int): Dimensionality of input feature vectors (e.g., 768).
+            num_classes (int): Number of output classification targets.
+            drop_rate (float): Dropout probability rate.
+        """
+        super().__init__()
+        self.in_features = in_features
+        self.num_classes = num_classes
+        self.drop_rate = drop_rate
+
+        self.norm = nn.LayerNorm(in_features)
+        self.drop = nn.Dropout(p=drop_rate)
+        self.head = nn.Linear(in_features, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass converting feature vectors [B, in_features] to logits [B, num_classes].
+        """
+        x = self.norm(x)
+        x = self.drop(x)
+        return self.head(x)
+
+
+class SwinClassifier(nn.Module):
+    """
+    Unified Swin Transformer Classification Model.
+
+    Combines SwinBackbone (with stem adaptation for 3 or 4 channels) and a custom
+    ClassificationHead to output logits of shape [batch_size, num_classes].
+    """
+
+    def __init__(
+        self,
+        backbone_name: str = "swin_tiny_patch4_window7_224",
+        input_channels: int = 4,
+        num_classes: int = 2,
+        pretrained: bool = True,
+        drop_rate: float = 0.2,
+    ):
+        """
+        Args:
+            backbone_name (str): Timm Swin Transformer architecture string.
+            input_channels (int): Number of input channels (3 for Kaggle, 4 for BraTS).
+            num_classes (int): Number of output classification targets (4 for Kaggle, 2 for BraTS).
+            pretrained (bool): Load ImageNet pretrained weights for backbone.
+            drop_rate (float): Dropout probability rate.
+        """
+        super().__init__()
+        self.backbone_name = backbone_name
+        self.input_channels = input_channels
+        self.num_classes = num_classes
+        self.pretrained = pretrained
+
+        # Feature extraction backbone (stem adapted)
+        self.backbone = SwinBackbone(
+            backbone_name=backbone_name,
+            input_channels=input_channels,
+            pretrained=pretrained,
+            drop_rate=drop_rate,
+        )
+
+        self.num_features = self.backbone.num_features  # 768 for swin_tiny
+
+        # Custom classification head
+        self.head = ClassificationHead(
+            in_features=self.num_features,
+            num_classes=num_classes,
+            drop_rate=drop_rate,
+        )
+
+        self.num_parameters = sum(p.numel() for p in self.parameters())
+
+    def forward(
+        self, x: torch.Tensor, return_features: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass returning output logits [B, num_classes].
+
+        Args:
+            x (torch.Tensor): Input image batch of shape [B, input_channels, 224, 224].
+            return_features (bool): If True, returns tuple (logits, features).
+
+        Returns:
+            torch.Tensor: Logits [B, num_classes] or Tuple (logits, features).
+        """
+        features = self.backbone(x)  # Shape: [B, 768]
+        logits = self.head(features)  # Shape: [B, num_classes]
+
+        if return_features:
+            return logits, features
+
+        return logits
+
+
 def build_swin_backbone(
     backbone_name: str = "swin_tiny_patch4_window7_224",
     input_channels: int = 4,
     pretrained: bool = True,
     drop_rate: float = 0.0,
 ) -> SwinBackbone:
-    """
-    Factory function to construct a SwinBackbone instance.
-
-    Args:
-        backbone_name (str): Timm Swin Transformer architecture string.
-        input_channels (int): Input channel count (3 or 4).
-        pretrained (bool): Load ImageNet pretrained weights.
-        drop_rate (float): Dropout probability.
-
-    Returns:
-        SwinBackbone: Instantiated feature extraction model.
-    """
     return SwinBackbone(
         backbone_name=backbone_name,
         input_channels=input_channels,
+        pretrained=pretrained,
+        drop_rate=drop_rate,
+    )
+
+
+def build_swin_classifier(
+    backbone_name: str = "swin_tiny_patch4_window7_224",
+    input_channels: int = 4,
+    num_classes: int = 2,
+    pretrained: bool = True,
+    drop_rate: float = 0.2,
+) -> SwinClassifier:
+    """
+    Factory function to construct a SwinClassifier instance.
+    """
+    return SwinClassifier(
+        backbone_name=backbone_name,
+        input_channels=input_channels,
+        num_classes=num_classes,
         pretrained=pretrained,
         drop_rate=drop_rate,
     )
