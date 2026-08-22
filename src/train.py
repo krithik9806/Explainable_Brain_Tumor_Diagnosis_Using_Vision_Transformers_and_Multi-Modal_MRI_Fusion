@@ -4,9 +4,9 @@ Full Config-Driven Training Loop for Vision Transformer & MRI Fusion Pipeline.
 This script executes training runs for both single-modality (Kaggle) and multi-modal fusion (BraTS) MRI classification:
 1. Loads configuration dynamically from YAML (configs/kaggle_config.yaml or configs/brats_fusion_config.yaml).
 2. Builds train and validation PyTorch DataLoaders (BraTSDataset or KaggleDataset).
-3. Instantiates SwinClassifier model matching input_channels (3 for Kaggle, 4 for BraTS) and num_classes (4 for Kaggle, 2 for BraTS).
-4. Executes training loop with AdamW optimizer, Cosine Annealing LR scheduler, and Cross-Entropy loss.
-5. Tracks metrics: train_loss, val_loss, val_accuracy per epoch.
+3. Supports automatic class imbalance mitigation (Class-Weighted Cross-Entropy Loss).
+4. Instantiates SwinClassifier model matching input_channels (3 for Kaggle, 4 for BraTS), num_classes, and backbone choice.
+5. Evaluates Accuracy and ROC AUC metrics per epoch.
 6. Saves best model checkpoint into experiment save_dir and top-level checkpoints/.
 7. Generates and saves training loss curve plots to results/.
 """
@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
@@ -27,6 +28,8 @@ from torch.utils.data import DataLoader, Subset
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from sklearn.metrics import roc_auc_score
 
 from src.data.datasets import BraTSDataset, KaggleDataset
 from src.models.swin_model import SwinClassifier
@@ -77,9 +80,10 @@ def validate(
     dataloader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-) -> Tuple[float, float]:
+    num_classes: int = 2,
+) -> Tuple[float, float, float]:
     """
-    Evaluates the model on validation data with explicit eval mode and no_grad context.
+    Evaluates the model on validation data with explicit eval mode, computing Loss, Accuracy, and ROC AUC.
     """
     model.eval()
     assert not model.training, "Model must be in evaluation mode (model.eval()) during validation"
@@ -87,6 +91,9 @@ def validate(
     running_loss = 0.0
     correct_preds = 0
     total_samples = 0
+
+    all_labels = []
+    all_probs = []
 
     with torch.no_grad():
         for images, labels in dataloader:
@@ -99,13 +106,30 @@ def validate(
             batch_size = images.size(0)
             running_loss += loss.item() * batch_size
 
+            probs = torch.softmax(outputs, dim=1)
             preds = torch.argmax(outputs, dim=1)
+
             correct_preds += torch.sum(preds == labels).item()
             total_samples += batch_size
 
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+
     val_loss = running_loss / max(total_samples, 1)
     val_acc = correct_preds / max(total_samples, 1)
-    return val_loss, val_acc
+
+    # Compute ROC AUC
+    all_labels = np.array(all_labels)
+    all_probs = np.array(all_probs)
+    try:
+        if num_classes == 2:
+            val_auc = float(roc_auc_score(all_labels, all_probs[:, 1]))
+        else:
+            val_auc = float(roc_auc_score(all_labels, all_probs, multi_class="ovr", average="macro"))
+    except Exception:
+        val_auc = 0.5  # Fallback if single class present in subset
+
+    return val_loss, val_acc, val_auc
 
 
 def plot_loss_curve(history: Dict[str, list], output_path: Path, title: str):
@@ -133,7 +157,9 @@ def run_training(
     config_path: str = "configs/kaggle_config.yaml",
     epochs_override: int = None,
     batch_size_override: int = None,
+    backbone_override: str = None,
     max_samples: int = None,
+    use_class_weights: bool = True,
     debug: bool = False,
 ):
     """
@@ -143,10 +169,12 @@ def run_training(
 
     # 1. Load configuration
     cfg = load_config(config_path)
+    backbone = backbone_override if backbone_override is not None else cfg.model.backbone
+
     print(f"=== Loaded Configuration from {config_path} ===", flush=True)
     print(f"Experiment Name: {cfg.experiment_name}", flush=True)
     print(f"Dataset Name: {cfg.dataset.name}", flush=True)
-    print(f"Backbone: {cfg.model.backbone}", flush=True)
+    print(f"Backbone Architecture: {backbone}", flush=True)
     print(f"Input Channels: {cfg.dataset.input_channels}", flush=True)
     print(f"Num Classes: {cfg.dataset.num_classes} ({getattr(cfg.dataset, 'class_names', [])})", flush=True)
 
@@ -181,31 +209,39 @@ def run_training(
         csv_path = PROJECT_ROOT / "data" / "processed" / "brats_splits.csv"
         train_dataset = BraTSDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
         val_dataset = BraTSDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
-        exp_prefix = "brats"
+        exp_prefix = f"brats_{'base' if 'base' in backbone else 'tiny'}"
     elif "kaggle" in ds_name:
         csv_path = PROJECT_ROOT / "data" / "processed" / "kaggle_splits.csv"
         train_dataset = KaggleDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
         val_dataset = KaggleDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
-        exp_prefix = "kaggle"
+        exp_prefix = f"kaggle_{'base' if 'base' in backbone else 'tiny'}"
     else:
         raise ValueError(f"Unrecognized dataset name '{cfg.dataset.name}' in config {config_path}")
 
-    # Report class distribution in training dataset
+    # Class balance audit & dynamic class weighting setup
+    class_weights_tensor = None
     if hasattr(train_dataset, "df"):
         label_col = "grade" if "grade" in train_dataset.df.columns else "class_name"
-        counts = train_dataset.df[label_col].value_counts().to_dict()
-        print(f"Train Class Distribution ({len(train_dataset)} total): {counts}", flush=True)
-        if "HGG" in counts and "LGG" in counts:
-            hgg_cnt = counts["HGG"]
-            lgg_cnt = counts["LGG"]
-            ratio = hgg_cnt / max(lgg_cnt, 1)
-            print(f" -> HGG:LGG Ratio: {ratio:.2f}:1 (HGG={hgg_cnt}, LGG={lgg_cnt})", flush=True)
-            if ratio > 3.0:
-                print(
-                    f" WARNING: Severe class imbalance detected ({ratio:.2f}:1 ratio > 3:1)! "
-                    f"Consider adding class-weighted loss or oversampling.",
-                    flush=True,
-                )
+        counts_dict = train_dataset.df[label_col].value_counts().to_dict()
+        print(f"Train Class Distribution ({len(train_dataset)} total): {counts_dict}", flush=True)
+
+        class_names = cfg.dataset.class_names
+        counts_list = [counts_dict.get(c_name, 0) for c_name in class_names]
+        total_count = sum(counts_list)
+        num_cls = len(class_names)
+
+        # Inverse frequency weighting
+        weights_np = [total_count / (num_cls * max(cnt, 1)) for cnt in counts_list]
+        weights_np = np.array(weights_np, dtype=np.float32)
+
+        ratio = max(counts_list) / max(min(counts_list), 1)
+        if ratio > 2.5 and use_class_weights:
+            class_weights_tensor = torch.tensor(weights_np, dtype=torch.float32).to(device)
+            print(
+                f" -> [CLASS WEIGHTING ENABLED] Imbalance Ratio {ratio:.2f}:1 detected. "
+                f"Class Weights applied to Loss: {dict(zip(class_names, [round(w, 3) for w in weights_np]))}",
+                flush=True,
+            )
 
     if max_samples is not None and max_samples > 0:
         train_subset_indices = list(range(min(len(train_dataset), max_samples)))
@@ -219,28 +255,28 @@ def run_training(
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
-    # 3. Instantiate SwinClassifier with dynamic input_channels & num_classes
+    # 3. Instantiate SwinClassifier with selected backbone, input_channels, num_classes
     print("=== Instantiating SwinClassifier ===", flush=True)
     model = SwinClassifier(
-        backbone_name=cfg.model.backbone,
+        backbone_name=backbone,
         input_channels=cfg.dataset.input_channels,
         num_classes=cfg.dataset.num_classes,
         pretrained=cfg.model.pretrained,
     )
     model = model.to(device)
-    print(f"Model parameters: {model.num_parameters:,}", flush=True)
+    print(f"Model parameters ({backbone}): {model.num_parameters:,}", flush=True)
 
     # Input shape sanity check
     sample_images, sample_labels = next(iter(train_loader))
     print(f"Input batch shape check: Images={sample_images.shape}, Labels={sample_labels.shape}", flush=True)
 
-    # 4. Optimizer, Scheduler, Loss
-    criterion = nn.CrossEntropyLoss()
+    # 4. Optimizer, Scheduler, Loss (with Class Weighting if enabled)
+    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     # 5. Setup W&B logging
-    run_name = f"{cfg.experiment_name}_debug" if debug else cfg.experiment_name
+    run_name = f"{cfg.experiment_name}_{backbone}_debug" if debug else f"{cfg.experiment_name}_{backbone}"
     wandb_run = setup_wandb_logging(
         project_name=cfg.logging.wandb_project_name,
         config=cfg,
@@ -248,7 +284,7 @@ def run_training(
     )
 
     # Ensure Checkpoint Directory
-    save_dir = Path(cfg.checkpointing.save_dir)
+    save_dir = Path(cfg.checkpointing.save_dir) / backbone
     save_dir.mkdir(parents=True, exist_ok=True)
     top_checkpoints_dir = PROJECT_ROOT / "checkpoints"
     top_checkpoints_dir.mkdir(parents=True, exist_ok=True)
@@ -256,8 +292,9 @@ def run_training(
     # Track metrics history and best model
     best_val_loss = float("inf")
     best_val_acc = 0.0
+    best_val_auc = 0.0
     best_epoch = 0
-    history = {"epoch": [], "train_loss": [], "val_loss": [], "val_acc": []}
+    history = {"epoch": [], "train_loss": [], "val_loss": [], "val_acc": [], "val_auc": []}
 
     # 6. Training Loop
     print(f"\n=== Starting Training ({epochs} Epochs) ===", flush=True)
@@ -270,7 +307,9 @@ def run_training(
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
 
         # Validate
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        val_loss, val_acc, val_auc = validate(
+            model, val_loader, criterion, device, num_classes=cfg.dataset.num_classes
+        )
 
         # Step LR scheduler
         scheduler.step()
@@ -283,12 +322,14 @@ def run_training(
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
+        history["val_auc"].append(val_auc)
 
         print(
             f"Epoch [{epoch}/{epochs}] ({epoch_duration:.1f}s) -> "
             f"Train Loss: {train_loss:.4f} | "
             f"Val Loss: {val_loss:.4f} | "
             f"Val Acc: {val_acc * 100:.2f}% | "
+            f"Val AUC: {val_auc:.4f} | "
             f"Next LR: {next_lr:.6f}",
             flush=True,
         )
@@ -300,6 +341,7 @@ def run_training(
                 "train_loss": train_loss,
                 "val_loss": val_loss,
                 "val_accuracy": val_acc,
+                "val_auc": val_auc,
                 "learning_rate": current_lr,
             },
             step=epoch,
@@ -314,6 +356,8 @@ def run_training(
             "train_loss": train_loss,
             "val_loss": val_loss,
             "val_acc": val_acc,
+            "val_auc": val_auc,
+            "backbone": backbone,
             "config": dict(cfg),
         }
 
@@ -335,7 +379,10 @@ def run_training(
 
         if is_best:
             best_epoch = epoch
-            # Save inside experiment save_dir (e.g., checkpoints/brats_fusion/)
+            best_val_acc = val_acc
+            best_val_auc = val_auc
+
+            # Save inside experiment save_dir
             best_model_pt = save_dir / "best_model.pt"
             best_model_pth = save_dir / "best_model.pth"
             torch.save(checkpoint_dict, best_model_pt)
@@ -344,6 +391,9 @@ def run_training(
             # Save top-level checkpoints/{exp_prefix}_best_model.pth per project spec
             top_best_pth = top_checkpoints_dir / f"{exp_prefix}_best_model.pth"
             torch.save(checkpoint_dict, top_best_pth)
+            if exp_prefix.startswith("brats"):
+                # Also save standard top-level checkpoints/brats_best_model.pth
+                torch.save(checkpoint_dict, top_checkpoints_dir / "brats_best_model.pth")
 
             print(
                 f" -> [BEST MODEL UPDATED] Epoch {epoch} reached best {metric_to_monitor}: "
@@ -363,12 +413,26 @@ def run_training(
     plot_loss_curve(
         history,
         results_dir / f"{exp_prefix}_loss_curve.png",
-        f"Swin Transformer {cfg.experiment_name} - Loss Curve",
+        f"Swin ({backbone}) {cfg.experiment_name} - Loss Curve",
     )
 
     finish_wandb_logging()
     print(f"\n=== Training Completed Successfully in {time_str} ===", flush=True)
-    print(f"Final Metrics -> Best Epoch: {best_epoch} | Best Val Loss: {best_val_loss:.4f} | Final Val Acc: {history['val_acc'][-1]*100:.2f}%", flush=True)
+    print(
+        f"Final Metrics ({backbone}) -> Best Epoch: {best_epoch} | "
+        f"Best Val Loss: {best_val_loss:.4f} | "
+        f"Best Val Acc: {best_val_acc * 100:.2f}% | "
+        f"Best Val AUC: {best_val_auc:.4f}",
+        flush=True,
+    )
+    return {
+        "backbone": backbone,
+        "best_epoch": best_epoch,
+        "best_val_loss": best_val_loss,
+        "best_val_acc": best_val_acc,
+        "best_val_auc": best_val_auc,
+        "training_time": time_str,
+    }
 
 
 def main():
@@ -376,7 +440,9 @@ def main():
     parser.add_argument("--config", type=str, default="configs/kaggle_config.yaml", help="Path to config file")
     parser.add_argument("--epochs", type=int, default=None, help="Override number of epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Override batch size")
+    parser.add_argument("--backbone", type=str, default=None, help="Override Swin backbone (e.g. swin_tiny_patch4_window7_224 or swin_base_patch4_window7_224)")
     parser.add_argument("--max_samples", type=int, default=None, help="Max dataset samples for debug/fast run")
+    parser.add_argument("--no_class_weights", action="store_true", help="Disable automatic class-weighted loss")
     parser.add_argument("--debug", action="store_true", help="Run short debug mode (3 epochs, 300 samples)")
 
     args = parser.parse_args()
@@ -384,7 +450,9 @@ def main():
         config_path=args.config,
         epochs_override=args.epochs,
         batch_size_override=args.batch_size,
+        backbone_override=args.backbone,
         max_samples=args.max_samples,
+        use_class_weights=not args.no_class_weights,
         debug=args.debug,
     )
 

@@ -109,12 +109,21 @@ class SwinBackbone(nn.Module):
         self.input_channels = input_channels
         self.pretrained = pretrained
 
-        self.backbone = timm.create_model(
-            backbone_name,
-            pretrained=pretrained,
-            num_classes=0,
-            drop_rate=drop_rate,
-        )
+        try:
+            self.backbone = timm.create_model(
+                backbone_name,
+                pretrained=pretrained,
+                num_classes=0,
+                drop_rate=drop_rate,
+            )
+        except Exception as e:
+            print(f"[Warning] Failed to download pretrained weights for '{backbone_name}' ({e}). Initializing without pretrained weights.", flush=True)
+            self.backbone = timm.create_model(
+                backbone_name,
+                pretrained=False,
+                num_classes=0,
+                drop_rate=drop_rate,
+            )
 
         self.initial_param_count = sum(p.numel() for p in self.backbone.parameters())
 
