@@ -1,14 +1,14 @@
 """
-Full Training Loop for Vision Transformer & MRI Fusion Pipeline.
+Full Config-Driven Training Loop for Vision Transformer & MRI Fusion Pipeline.
 
-This script executes the full training run for single-modality brain tumor classification:
-1. Loads configuration from YAML (configs/kaggle_config.yaml).
-2. Builds full train and validation PyTorch DataLoaders (Kaggle dataset).
-3. Instantiates SwinClassifier model (input_channels=3, num_classes=4).
+This script executes training runs for both single-modality (Kaggle) and multi-modal fusion (BraTS) MRI classification:
+1. Loads configuration dynamically from YAML (configs/kaggle_config.yaml or configs/brats_fusion_config.yaml).
+2. Builds train and validation PyTorch DataLoaders (BraTSDataset or KaggleDataset).
+3. Instantiates SwinClassifier model matching input_channels (3 for Kaggle, 4 for BraTS) and num_classes (4 for Kaggle, 2 for BraTS).
 4. Executes training loop with AdamW optimizer, Cosine Annealing LR scheduler, and Cross-Entropy loss.
 5. Tracks metrics: train_loss, val_loss, val_accuracy per epoch.
-6. Saves best model checkpoint as checkpoints/kaggle_best_model.pth (and inside checkpoints/kaggle/).
-7. Generates and saves training loss curve plot to results/loss_curve.png.
+6. Saves best model checkpoint into experiment save_dir and top-level checkpoints/.
+7. Generates and saves training loss curve plots to results/.
 """
 
 import argparse
@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.datasets import KaggleDataset
+from src.data.datasets import BraTSDataset, KaggleDataset
 from src.models.swin_model import SwinClassifier
 from src.utils.config_loader import load_config
 from src.utils.logging_setup import finish_wandb_logging, log_metrics, setup_wandb_logging
@@ -108,7 +108,7 @@ def validate(
     return val_loss, val_acc
 
 
-def plot_loss_curve(history: Dict[str, list], output_path: Path):
+def plot_loss_curve(history: Dict[str, list], output_path: Path, title: str):
     """
     Plots training vs validation loss curve and saves plot image.
     """
@@ -118,7 +118,7 @@ def plot_loss_curve(history: Dict[str, list], output_path: Path):
     plt.figure(figsize=(9, 5))
     plt.plot(epochs, history["train_loss"], label="Train Loss", marker="o", linewidth=2)
     plt.plot(epochs, history["val_loss"], label="Val Loss", marker="s", linewidth=2)
-    plt.title("Swin Transformer Kaggle Classification - Loss Curve")
+    plt.title(title)
     plt.xlabel("Epoch")
     plt.ylabel("Cross-Entropy Loss")
     plt.legend()
@@ -137,7 +137,7 @@ def run_training(
     debug: bool = False,
 ):
     """
-    Main training execution function.
+    Main config-driven training execution function supporting Kaggle & BraTS experiments.
     """
     start_time = time.time()
 
@@ -145,8 +145,10 @@ def run_training(
     cfg = load_config(config_path)
     print(f"=== Loaded Configuration from {config_path} ===", flush=True)
     print(f"Experiment Name: {cfg.experiment_name}", flush=True)
+    print(f"Dataset Name: {cfg.dataset.name}", flush=True)
     print(f"Backbone: {cfg.model.backbone}", flush=True)
-    print(f"Num Classes: {cfg.dataset.num_classes}", flush=True)
+    print(f"Input Channels: {cfg.dataset.input_channels}", flush=True)
+    print(f"Num Classes: {cfg.dataset.num_classes} ({getattr(cfg.dataset, 'class_names', [])})", flush=True)
 
     # Determine device & report compute
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -167,16 +169,43 @@ def run_training(
     if debug:
         print("[DEBUG MODE] Overriding run settings for fast debug validation:", flush=True)
         if epochs_override is None:
-            epochs = 2
+            epochs = 3
         if max_samples is None:
-            max_samples = 500
+            max_samples = 300
         print(f" -> Epochs: {epochs}, Max Samples: {max_samples}, Batch Size: {batch_size}", flush=True)
 
-    # 2. Setup DataLoaders
+    # 2. Setup DataLoaders dynamically based on dataset name
     print("=== Loading Data ===", flush=True)
-    csv_path = PROJECT_ROOT / "data" / "processed" / "kaggle_splits.csv"
-    train_dataset = KaggleDataset(csv_path=csv_path, split="train")
-    val_dataset = KaggleDataset(csv_path=csv_path, split="val")
+    ds_name = cfg.dataset.name.lower()
+    if "brats" in ds_name:
+        csv_path = PROJECT_ROOT / "data" / "processed" / "brats_splits.csv"
+        train_dataset = BraTSDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
+        val_dataset = BraTSDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
+        exp_prefix = "brats"
+    elif "kaggle" in ds_name:
+        csv_path = PROJECT_ROOT / "data" / "processed" / "kaggle_splits.csv"
+        train_dataset = KaggleDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
+        val_dataset = KaggleDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
+        exp_prefix = "kaggle"
+    else:
+        raise ValueError(f"Unrecognized dataset name '{cfg.dataset.name}' in config {config_path}")
+
+    # Report class distribution in training dataset
+    if hasattr(train_dataset, "df"):
+        label_col = "grade" if "grade" in train_dataset.df.columns else "class_name"
+        counts = train_dataset.df[label_col].value_counts().to_dict()
+        print(f"Train Class Distribution ({len(train_dataset)} total): {counts}", flush=True)
+        if "HGG" in counts and "LGG" in counts:
+            hgg_cnt = counts["HGG"]
+            lgg_cnt = counts["LGG"]
+            ratio = hgg_cnt / max(lgg_cnt, 1)
+            print(f" -> HGG:LGG Ratio: {ratio:.2f}:1 (HGG={hgg_cnt}, LGG={lgg_cnt})", flush=True)
+            if ratio > 3.0:
+                print(
+                    f" WARNING: Severe class imbalance detected ({ratio:.2f}:1 ratio > 3:1)! "
+                    f"Consider adding class-weighted loss or oversampling.",
+                    flush=True,
+                )
 
     if max_samples is not None and max_samples > 0:
         train_subset_indices = list(range(min(len(train_dataset), max_samples)))
@@ -190,7 +219,7 @@ def run_training(
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
-    # 3. Instantiate Model
+    # 3. Instantiate SwinClassifier with dynamic input_channels & num_classes
     print("=== Instantiating SwinClassifier ===", flush=True)
     model = SwinClassifier(
         backbone_name=cfg.model.backbone,
@@ -200,6 +229,10 @@ def run_training(
     )
     model = model.to(device)
     print(f"Model parameters: {model.num_parameters:,}", flush=True)
+
+    # Input shape sanity check
+    sample_images, sample_labels = next(iter(train_loader))
+    print(f"Input batch shape check: Images={sample_images.shape}, Labels={sample_labels.shape}", flush=True)
 
     # 4. Optimizer, Scheduler, Loss
     criterion = nn.CrossEntropyLoss()
@@ -302,14 +335,14 @@ def run_training(
 
         if is_best:
             best_epoch = epoch
-            # Save inside checkpoints/kaggle/
+            # Save inside experiment save_dir (e.g., checkpoints/brats_fusion/)
             best_model_pt = save_dir / "best_model.pt"
             best_model_pth = save_dir / "best_model.pth"
             torch.save(checkpoint_dict, best_model_pt)
             torch.save(checkpoint_dict, best_model_pth)
 
-            # Save top-level checkpoints/kaggle_best_model.pth per project spec
-            top_best_pth = top_checkpoints_dir / "kaggle_best_model.pth"
+            # Save top-level checkpoints/{exp_prefix}_best_model.pth per project spec
+            top_best_pth = top_checkpoints_dir / f"{exp_prefix}_best_model.pth"
             torch.save(checkpoint_dict, top_best_pth)
 
             print(
@@ -327,7 +360,11 @@ def run_training(
 
     # Plot and save loss curve
     results_dir = PROJECT_ROOT / "results"
-    plot_loss_curve(history, results_dir / "loss_curve.png")
+    plot_loss_curve(
+        history,
+        results_dir / f"{exp_prefix}_loss_curve.png",
+        f"Swin Transformer {cfg.experiment_name} - Loss Curve",
+    )
 
     finish_wandb_logging()
     print(f"\n=== Training Completed Successfully in {time_str} ===", flush=True)
@@ -340,7 +377,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=None, help="Override number of epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Override batch size")
     parser.add_argument("--max_samples", type=int, default=None, help="Max dataset samples for debug/fast run")
-    parser.add_argument("--debug", action="store_true", help="Run short debug mode (2 epochs, 500 samples)")
+    parser.add_argument("--debug", action="store_true", help="Run short debug mode (3 epochs, 300 samples)")
 
     args = parser.parse_args()
     run_training(
