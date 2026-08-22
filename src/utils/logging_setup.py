@@ -50,3 +50,17 @@ def log_metrics(metrics: Dict[str, Any], step: Optional[int] = None):
     except Exception:
         pass
 
+
+def finish_wandb_logging():
+    """
+    Safely finish active W&B run if active.
+    """
+    try:
+        import wandb
+        if wandb.run is not None:
+            wandb.finish()
+            print("[Logging Setup] W&B run finished successfully.")
+    except Exception:
+        pass
+
+

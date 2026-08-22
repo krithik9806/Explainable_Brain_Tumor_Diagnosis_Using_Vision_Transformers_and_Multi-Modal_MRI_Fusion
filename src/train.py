@@ -1,13 +1,18 @@
 """
-Baseline Training Loop for Vision Transformer & MRI Fusion Pipeline.
+Hardened Baseline Training Loop for Vision Transformer & MRI Fusion Pipeline.
 
-This script implements the baseline training loop for single-modality brain tumor classification:
+This script executes and validates the baseline training loop for single-modality brain tumor classification:
 1. Loads configuration from YAML (e.g. configs/kaggle_config.yaml).
-2. Initializes train and validation PyTorch DataLoaders.
+2. Builds train and validation PyTorch DataLoaders.
 3. Instantiates SwinClassifier model (input_channels=3, num_classes=4).
 4. Executes training loop with AdamW optimizer, Cosine Annealing LR scheduler, and Cross-Entropy loss.
-5. Logs epoch metrics (train_loss, val_loss, val_accuracy) to console and Weights & Biases (wandb).
-6. Saves model checkpoints after every epoch to the configured checkpoint directory.
+5. Performs explicit correctness assertions:
+   - Separate train vs val loss/accuracy calculation with sample-weighted averaging.
+   - Strict model.train() during training and model.eval() with torch.no_grad() during validation.
+   - Per-step optimizer.zero_grad() to prevent unintended gradient accumulation.
+   - Per-epoch scheduler.step() for proper learning rate decay.
+6. Logs metrics to console and Weights & Biases (wandb).
+7. Saves per-epoch checkpoints (checkpoint_epoch_{N}.pt / .pth) AND tracks/saves the best model (best_model.pt / .pth).
 """
 
 import argparse
@@ -28,7 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.data.datasets import KaggleDataset, get_dataloaders_from_config
 from src.models.swin_model import SwinClassifier
 from src.utils.config_loader import load_config
-from src.utils.logging_setup import log_metrics, setup_wandb_logging
+from src.utils.logging_setup import finish_wandb_logging, log_metrics, setup_wandb_logging
 
 
 def train_one_epoch(
@@ -39,7 +44,7 @@ def train_one_epoch(
     device: torch.device,
 ) -> float:
     """
-    Executes one training epoch over the given dataloader.
+    Executes one training epoch with explicit mode verification and per-step zero_grad.
 
     Args:
         model: SwinClassifier model instance.
@@ -49,9 +54,12 @@ def train_one_epoch(
         device: Torch compute device (CPU or CUDA).
 
     Returns:
-        float: Average training loss for the epoch.
+        float: Sample-weighted average training loss for the epoch.
     """
+    # CORRECTNESS CHECK 1: Ensure model is explicitly set to training mode
     model.train()
+    assert model.training, "Model must be in training mode (model.train()) during train_one_epoch"
+
     running_loss = 0.0
     total_samples = 0
 
@@ -59,9 +67,16 @@ def train_one_epoch(
         images = images.to(device)
         labels = labels.to(device)
 
+        # CORRECTNESS CHECK 2: Zero gradients BEFORE forward pass on every mini-batch
         optimizer.zero_grad()
+
         outputs = model(images)
         loss = criterion(outputs, labels)
+
+        # Check for NaN/Inf in loss
+        if torch.isnan(loss) or torch.isinf(loss):
+            raise ValueError(f"NaN or Inf loss encountered at step {step}: loss={loss.item()}")
+
         loss.backward()
         optimizer.step()
 
@@ -80,7 +95,7 @@ def validate(
     device: torch.device,
 ) -> Tuple[float, float]:
     """
-    Evaluates the model on validation data.
+    Evaluates the model on validation data with explicit eval mode and no_grad context.
 
     Args:
         model: SwinClassifier model instance.
@@ -91,15 +106,17 @@ def validate(
     Returns:
         Tuple[float, float]: (validation_loss, validation_accuracy)
     """
+    # CORRECTNESS CHECK 3: Ensure model is explicitly set to evaluation mode
     model.eval()
+    assert not model.training, "Model must be in evaluation mode (model.eval()) during validation"
+
     running_loss = 0.0
     correct_preds = 0
     total_samples = 0
 
+    # CORRECTNESS CHECK 4: Disable gradient computation during evaluation
     with torch.no_grad():
-        for images, labels in enumerate(dataloader) if isinstance(dataloader, list) else dataloader:
-            if isinstance(images, int):  # fallback check
-                continue
+        for images, labels in dataloader:
             images = images.to(device)
             labels = labels.to(device)
 
@@ -150,6 +167,7 @@ def run_training(
     batch_size = batch_size_override if batch_size_override is not None else cfg.training.batch_size
     learning_rate = cfg.training.learning_rate
     weight_decay = cfg.training.weight_decay
+    metric_to_monitor = getattr(cfg.checkpointing, "metric_to_monitor", "val_loss")
 
     if debug:
         print("[DEBUG MODE] Overriding run settings for fast debug validation:", flush=True)
@@ -206,27 +224,34 @@ def run_training(
     save_dir.mkdir(parents=True, exist_ok=True)
     print(f"Checkpoint directory ready: {save_dir.resolve()}", flush=True)
 
+    # Track best model checkpoint
+    best_val_loss = float("inf")
+    best_val_acc = 0.0
+    best_epoch = 0
+
     # 6. Training Loop
     print(f"\n=== Starting Training ({epochs} Epochs) ===", flush=True)
     for epoch in range(1, epochs + 1):
         current_lr = optimizer.param_groups[0]["lr"]
-        print(f"\nEpoch [{epoch}/{epochs}] - LR: {current_lr:.6f}", flush=True)
+        print(f"\nEpoch [{epoch}/{epochs}] - Current LR: {current_lr:.6f}", flush=True)
 
-        # Train
+        # Train one epoch
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
 
         # Validate
         val_loss, val_acc = validate(model, val_loader, criterion, device)
 
-        # Step LR scheduler
+        # CORRECTNESS CHECK 5: Step learning rate scheduler AFTER each epoch
         scheduler.step()
+        next_lr = optimizer.param_groups[0]["lr"]
 
         # Log metrics to console
         print(
             f"Epoch [{epoch}/{epochs}] Summary -> "
             f"Train Loss: {train_loss:.4f} | "
             f"Val Loss: {val_loss:.4f} | "
-            f"Val Acc: {val_acc * 100:.2f}%",
+            f"Val Acc: {val_acc * 100:.2f}% | "
+            f"Next LR: {next_lr:.6f}",
             flush=True,
         )
 
@@ -242,8 +267,7 @@ def run_training(
             step=epoch,
         )
 
-        # 7. Save Checkpoint
-        checkpoint_path = save_dir / f"checkpoint_epoch_{epoch}.pt"
+        # 7. Save Per-Epoch Checkpoint (support both .pt and .pth filename formats)
         checkpoint_dict = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
@@ -254,10 +278,40 @@ def run_training(
             "val_acc": val_acc,
             "config": dict(cfg),
         }
-        torch.save(checkpoint_dict, checkpoint_path)
-        print(f" -> Checkpoint saved to: {checkpoint_path.resolve()}", flush=True)
 
-    print("\n=== Training Completed Successfully ===", flush=True)
+        epoch_ckpt_pt = save_dir / f"checkpoint_epoch_{epoch}.pt"
+        epoch_ckpt_pth = save_dir / f"checkpoint_epoch_{epoch}.pth"
+        torch.save(checkpoint_dict, epoch_ckpt_pt)
+        torch.save(checkpoint_dict, epoch_ckpt_pth)
+        print(f" -> Epoch {epoch} checkpoint saved: {epoch_ckpt_pt.name} & {epoch_ckpt_pth.name}", flush=True)
+
+        # 8. Best Model Checkpoint Tracking
+        is_best = False
+        if metric_to_monitor == "val_loss":
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                is_best = True
+        else:
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                is_best = True
+
+        if is_best:
+            best_epoch = epoch
+            best_model_pt = save_dir / "best_model.pt"
+            best_model_pth = save_dir / "best_model.pth"
+            torch.save(checkpoint_dict, best_model_pt)
+            torch.save(checkpoint_dict, best_model_pth)
+            print(
+                f" -> [BEST MODEL UPDATED] Epoch {epoch} reached new best {metric_to_monitor}: "
+                f"{val_loss if metric_to_monitor == 'val_loss' else val_acc * 100:.2f}. "
+                f"Saved to {best_model_pt.name} & {best_model_pth.name}",
+                flush=True,
+            )
+
+    finish_wandb_logging()
+    print(f"\n=== Training Completed Successfully ===", flush=True)
+    print(f"Best model was saved from Epoch {best_epoch} monitoring '{metric_to_monitor}'.", flush=True)
 
 
 def main():
