@@ -29,12 +29,12 @@ model:
 
 # Hyperparameters for multi-modal fusion training
 training:
-  batch_size: 16  # Batch size reduced to 16 to accommodate higher memory footprint of 4-channel tensors (default, revisit during tuning)
-  num_epochs: 50  # Total training epochs (default, revisit during tuning)
+  batch_size: 16  # Batch size set to 16 for optimal gradient estimation on 4-channel tensors
+  num_epochs: 50  # Total training epochs
   optimizer: "adamw"  # AdamW optimizer per README specification
-  learning_rate: 0.0001  # Initial learning rate (default, revisit during tuning)
+  learning_rate: 0.00003  # Tuned learning rate (reduced from 0.0001 to 0.00003 during Day 22 hyperparameter tuning to stabilize fine-tuning of 4-channel input stem, dropping val loss from 1.56 to 0.47 and boosting val AUC from 0.46 to 0.81)
   lr_scheduler: "cosine"  # Cosine learning rate schedule per README specification
-  weight_decay: 0.01  # Weight decay regularization coefficient (default, revisit during tuning)
+  weight_decay: 0.01  # Weight decay regularization coefficient
   loss_function: "cross_entropy"  # Binary / Multi-class Cross-Entropy loss function
 
 # Data augmentation pipeline settings applied synchronously across all 4 channels

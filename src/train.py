@@ -157,7 +157,11 @@ def run_training(
     config_path: str = "configs/kaggle_config.yaml",
     epochs_override: int = None,
     batch_size_override: int = None,
+    learning_rate_override: float = None,
+    weight_decay_override: float = None,
     backbone_override: str = None,
+    run_name_override: str = None,
+    transform_override = None,
     max_samples: int = None,
     use_class_weights: bool = True,
     debug: bool = False,
@@ -190,8 +194,8 @@ def run_training(
     # Hyperparameters
     epochs = epochs_override if epochs_override is not None else cfg.training.num_epochs
     batch_size = batch_size_override if batch_size_override is not None else cfg.training.batch_size
-    learning_rate = cfg.training.learning_rate
-    weight_decay = cfg.training.weight_decay
+    learning_rate = learning_rate_override if learning_rate_override is not None else cfg.training.learning_rate
+    weight_decay = weight_decay_override if weight_decay_override is not None else cfg.training.weight_decay
     metric_to_monitor = getattr(cfg.checkpointing, "metric_to_monitor", "val_loss")
 
     if debug:
@@ -207,12 +211,12 @@ def run_training(
     ds_name = cfg.dataset.name.lower()
     if "brats" in ds_name:
         csv_path = PROJECT_ROOT / "data" / "processed" / "brats_splits.csv"
-        train_dataset = BraTSDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
+        train_dataset = BraTSDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names, transform=transform_override)
         val_dataset = BraTSDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
         exp_prefix = f"brats_{'base' if 'base' in backbone else 'tiny'}"
     elif "kaggle" in ds_name:
         csv_path = PROJECT_ROOT / "data" / "processed" / "kaggle_splits.csv"
-        train_dataset = KaggleDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names)
+        train_dataset = KaggleDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names, transform=transform_override)
         val_dataset = KaggleDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
         exp_prefix = f"kaggle_{'base' if 'base' in backbone else 'tiny'}"
     else:
@@ -276,7 +280,7 @@ def run_training(
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     # 5. Setup W&B logging
-    run_name = f"{cfg.experiment_name}_{backbone}_debug" if debug else f"{cfg.experiment_name}_{backbone}"
+    run_name = run_name_override if run_name_override is not None else (f"{cfg.experiment_name}_{backbone}_debug" if debug else f"{cfg.experiment_name}_{backbone}")
     wandb_run = setup_wandb_logging(
         project_name=cfg.logging.wandb_project_name,
         config=cfg,
