@@ -190,11 +190,11 @@ explainable-brain-tumor-swin/
 
 | Model              | Accuracy | Precision | Recall | F1-score | AUC   |
 |--------------------|----------|-----------|--------|----------|-------|
-| Swin-Tiny (single-modality) | –   | –         | –      | –        | –     |
-| Swin-Tiny (multi-modal fusion) | – | –       | –      | –        | –     |
-| Swin-Base (multi-modal fusion) | – | –       | –      | –        | –     |
+| Swin-Tiny (single-modality) | 87.75% | 0.8908 | 0.8775 | 0.8751 | 0.9759 |
+| Swin-Tiny (multi-modal fusion) | 80.95% | 0.8095 | 1.0000 | 0.8947 | 0.5622 |
+| Swin-Base (multi-modal fusion) | 56.29% | 0.9101 | 0.5105 | 0.6541 | 0.7315 |
 
-> Replace with your actual experiment results once training is complete. Include a confusion matrix and ROC curves in `results/`.
+> Evaluation results computed strictly on held-out test splits (`split == 'test'`). For the multi-class Kaggle single-modality experiment, One-vs-Rest (OvR) macro-averaged AUC and macro-averaged precision/recall/F1 are reported. Confusion matrix and ROC curve plots for all models are saved under [`results/`](results/).
 
 ---
 
