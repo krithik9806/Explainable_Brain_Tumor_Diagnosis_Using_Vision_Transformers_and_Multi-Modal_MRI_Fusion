@@ -1,0 +1,94 @@
+=== Loaded Configuration from configs/brats_fusion_config.yaml ===
+Experiment Name: brats_multimodal_fusion_swin
+Dataset Name: brats2020_fusion
+Backbone Architecture: swin_base_patch4_window7_224
+Input Channels: 4
+Num Classes: 2 (['LGG', 'HGG'])
+=== Compute Device Status ===
+Device: CPU-only
+WARNING: CUDA is not available. Training on CPU will be significantly slower.
+=== Loading Data ===
+Train Class Distribution (2744 total): {'HGG': 2184, 'LGG': 560}
+ -> [CLASS WEIGHTING ENABLED] Imbalance Ratio 3.90:1 detected. Class Weights applied to Loss: {'LGG': 2.45, 'HGG': 0.628}
+ -> [WEIGHTED SAMPLER ENABLED] Balanced batch sampling per epoch.
+Full Dataset sizes: Train=2744, Val=588
+=== Instantiating SwinClassifier ===
+Model parameters (swin_base_patch4_window7_224): 86,746,478
+Input batch shape check: Images=torch.Size([16, 4, 224, 224]), Labels=torch.Size([16])
+
+=== Starting Training (20 Epochs) ===
+
+Epoch [1/20] - Current LR: 0.000015
+Epoch [1/20] (203.2s) -> Train Loss: 0.6121 | Train Acc: 66.58% | Val Loss: 0.5361 | Val Acc: 71.94% | Val F1: 0.8143 | Val AUC: 0.7725 | Rec LGG: 0.7286 | Rec HGG: 0.7165 | Next LR: 0.000015
+ -> [BEST MODEL UPDATED] Epoch 1 reached best val_loss: 0.54. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [2/20] - Current LR: 0.000014
+Epoch [2/20] (204.1s) -> Train Loss: 0.4722 | Train Acc: 77.41% | Val Loss: 0.4430 | Val Acc: 79.59% | Val F1: 0.8655 | Val AUC: 0.8600 | Rec LGG: 0.7857 | Rec HGG: 0.7991 | Next LR: 0.000014
+ -> [BEST MODEL UPDATED] Epoch 2 reached best val_loss: 0.44. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [3/20] - Current LR: 0.000014
+Epoch [3/20] (201.2s) -> Train Loss: 0.3842 | Train Acc: 82.51% | Val Loss: 0.3887 | Val Acc: 81.63% | Val F1: 0.8768 | Val AUC: 0.9015 | Rec LGG: 0.8429 | Rec HGG: 0.8080 | Next LR: 0.000014
+ -> [BEST MODEL UPDATED] Epoch 3 reached best val_loss: 0.39. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [4/20] - Current LR: 0.000013
+Epoch [4/20] (205.1s) -> Train Loss: 0.3168 | Train Acc: 86.41% | Val Loss: 0.3444 | Val Acc: 85.03% | Val F1: 0.9012 | Val AUC: 0.9272 | Rec LGG: 0.8357 | Rec HGG: 0.8549 | Next LR: 0.000013
+ -> [BEST MODEL UPDATED] Epoch 4 reached best val_loss: 0.34. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [5/20] - Current LR: 0.000012
+Epoch [5/20] (200.7s) -> Train Loss: 0.2526 | Train Acc: 89.25% | Val Loss: 0.2982 | Val Acc: 86.73% | Val F1: 0.9113 | Val AUC: 0.9472 | Rec LGG: 0.8714 | Rec HGG: 0.8661 | Next LR: 0.000012
+ -> [BEST MODEL UPDATED] Epoch 5 reached best val_loss: 0.30. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [6/20] - Current LR: 0.000011
+Epoch [6/20] (204.3s) -> Train Loss: 0.2078 | Train Acc: 91.22% | Val Loss: 0.3204 | Val Acc: 85.37% | Val F1: 0.9009 | Val AUC: 0.9520 | Rec LGG: 0.9000 | Rec HGG: 0.8393 | Next LR: 0.000011
+
+Epoch [7/20] - Current LR: 0.000010
+Epoch [7/20] (200.5s) -> Train Loss: 0.1706 | Train Acc: 93.18% | Val Loss: 0.2796 | Val Acc: 87.76% | Val F1: 0.9179 | Val AUC: 0.9610 | Rec LGG: 0.8857 | Rec HGG: 0.8750 | Next LR: 0.000010
+ -> [BEST MODEL UPDATED] Epoch 7 reached best val_loss: 0.28. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [8/20] - Current LR: 0.000008
+Epoch [8/20] (203.2s) -> Train Loss: 0.1448 | Train Acc: 94.46% | Val Loss: 0.2662 | Val Acc: 88.61% | Val F1: 0.9238 | Val AUC: 0.9652 | Rec LGG: 0.8857 | Rec HGG: 0.8862 | Next LR: 0.000008
+ -> [BEST MODEL UPDATED] Epoch 8 reached best val_loss: 0.27. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [9/20] - Current LR: 0.000007
+Epoch [9/20] (201.7s) -> Train Loss: 0.1197 | Train Acc: 95.81% | Val Loss: 0.2483 | Val Acc: 89.29% | Val F1: 0.9284 | Val AUC: 0.9687 | Rec LGG: 0.8929 | Rec HGG: 0.8929 | Next LR: 0.000007
+ -> [BEST MODEL UPDATED] Epoch 9 reached best val_loss: 0.25. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [10/20] - Current LR: 0.000006
+Epoch [10/20] (204.8s) -> Train Loss: 0.1065 | Train Acc: 96.14% | Val Loss: 0.2472 | Val Acc: 89.63% | Val F1: 0.9304 | Val AUC: 0.9691 | Rec LGG: 0.9000 | Rec HGG: 0.8951 | Next LR: 0.000006
+ -> [BEST MODEL UPDATED] Epoch 10 reached best val_loss: 0.25. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [11/20] - Current LR: 0.000005
+Epoch [11/20] (201.9s) -> Train Loss: 0.0913 | Train Acc: 96.65% | Val Loss: 0.2485 | Val Acc: 89.80% | Val F1: 0.9317 | Val AUC: 0.9706 | Rec LGG: 0.8929 | Rec HGG: 0.8996 | Next LR: 0.000005
+
+Epoch [12/20] - Current LR: 0.000004
+Epoch [12/20] (204.0s) -> Train Loss: 0.0763 | Train Acc: 97.45% | Val Loss: 0.2393 | Val Acc: 90.31% | Val F1: 0.9351 | Val AUC: 0.9712 | Rec LGG: 0.9000 | Rec HGG: 0.9040 | Next LR: 0.000004
+ -> [BEST MODEL UPDATED] Epoch 12 reached best val_loss: 0.24. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [13/20] - Current LR: 0.000003
+Epoch [13/20] (200.7s) -> Train Loss: 0.0687 | Train Acc: 97.59% | Val Loss: 0.2384 | Val Acc: 90.48% | Val F1: 0.9363 | Val AUC: 0.9723 | Rec LGG: 0.9000 | Rec HGG: 0.9062 | Next LR: 0.000003
+ -> [BEST MODEL UPDATED] Epoch 13 reached best val_loss: 0.24. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [14/20] - Current LR: 0.000002
+Epoch [14/20] (204.6s) -> Train Loss: 0.0631 | Train Acc: 98.14% | Val Loss: 0.2372 | Val Acc: 90.48% | Val F1: 0.9363 | Val AUC: 0.9727 | Rec LGG: 0.9000 | Rec HGG: 0.9062 | Next LR: 0.000002
+ -> [BEST MODEL UPDATED] Epoch 14 reached best val_loss: 0.24. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [15/20] - Current LR: 0.000001
+Epoch [15/20] (200.9s) -> Train Loss: 0.0543 | Train Acc: 98.40% | Val Loss: 0.2378 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9731 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000001
+
+Epoch [16/20] - Current LR: 0.000001
+Epoch [16/20] (203.9s) -> Train Loss: 0.0505 | Train Acc: 98.65% | Val Loss: 0.2370 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9735 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000001
+ -> [BEST MODEL UPDATED] Epoch 16 reached best val_loss: 0.24. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [17/20] - Current LR: 0.000000
+Epoch [17/20] (201.2s) -> Train Loss: 0.0501 | Train Acc: 98.54% | Val Loss: 0.2366 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9735 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000000
+ -> [BEST MODEL UPDATED] Epoch 17 reached best val_loss: 0.24. Saved to checkpoints/brats_base_best_model.pth
+
+Epoch [18/20] - Current LR: 0.000000
+Epoch [18/20] (204.6s) -> Train Loss: 0.0469 | Train Acc: 98.72% | Val Loss: 0.2367 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9735 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000000
+
+Epoch [19/20] - Current LR: 0.000000
+Epoch [19/20] (201.1s) -> Train Loss: 0.0493 | Train Acc: 98.61% | Val Loss: 0.2366 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9736 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000000
+
+Epoch [20/20] - Current LR: 0.000000
+Epoch [20/20] (203.9s) -> Train Loss: 0.0494 | Train Acc: 98.65% | Val Loss: 0.2366 | Val Acc: 90.65% | Val F1: 0.9374 | Val AUC: 0.9736 | Rec LGG: 0.9000 | Rec HGG: 0.9085 | Next LR: 0.000000
+

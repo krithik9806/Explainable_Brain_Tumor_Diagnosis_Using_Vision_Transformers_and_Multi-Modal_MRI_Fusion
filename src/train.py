@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import f1_score, recall_score, roc_auc_score
 
 from src.data.datasets import BraTSDataset, KaggleDataset
 from src.models.swin_model import SwinClassifier
@@ -43,14 +43,16 @@ def train_one_epoch(
     criterion: nn.Module,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
-) -> float:
+) -> Tuple[float, float]:
     """
     Executes one training epoch with explicit mode verification and per-step zero_grad.
+    Returns (epoch_loss, epoch_acc).
     """
     model.train()
     assert model.training, "Model must be in training mode (model.train()) during train_one_epoch"
 
     running_loss = 0.0
+    correct_preds = 0
     total_samples = 0
 
     for step, (images, labels) in enumerate(dataloader):
@@ -69,10 +71,13 @@ def train_one_epoch(
 
         batch_size = images.size(0)
         running_loss += loss.item() * batch_size
+        preds = torch.argmax(outputs, dim=1)
+        correct_preds += torch.sum(preds == labels).item()
         total_samples += batch_size
 
     epoch_loss = running_loss / max(total_samples, 1)
-    return epoch_loss
+    epoch_acc = correct_preds / max(total_samples, 1)
+    return epoch_loss, epoch_acc
 
 
 def validate(
@@ -81,9 +86,10 @@ def validate(
     criterion: nn.Module,
     device: torch.device,
     num_classes: int = 2,
-) -> Tuple[float, float, float]:
+    class_names: list = None,
+) -> Tuple[float, float, float, float, dict]:
     """
-    Evaluates the model on validation data with explicit eval mode, computing Loss, Accuracy, and ROC AUC.
+    Evaluates the model on validation data with explicit eval mode, computing Loss, Accuracy, F1, ROC AUC, and Per-Class Recalls.
     """
     model.eval()
     assert not model.training, "Model must be in evaluation mode (model.eval()) during validation"
@@ -94,6 +100,7 @@ def validate(
 
     all_labels = []
     all_probs = []
+    all_preds = []
 
     with torch.no_grad():
         for images, labels in dataloader:
@@ -114,13 +121,29 @@ def validate(
 
             all_labels.extend(labels.cpu().numpy())
             all_probs.extend(probs.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
 
     val_loss = running_loss / max(total_samples, 1)
     val_acc = correct_preds / max(total_samples, 1)
 
-    # Compute ROC AUC
     all_labels = np.array(all_labels)
     all_probs = np.array(all_probs)
+    all_preds = np.array(all_preds)
+
+    # Compute F1 & Per-class recall
+    if num_classes == 2:
+        val_f1 = float(f1_score(all_labels, all_preds, average="binary", zero_division=0))
+    else:
+        val_f1 = float(f1_score(all_labels, all_preds, average="macro", zero_division=0))
+
+    recalls = {}
+    c_names = class_names or [f"class_{i}" for i in range(num_classes)]
+    from sklearn.metrics import recall_score
+    rec_list = recall_score(all_labels, all_preds, average=None, labels=list(range(num_classes)), zero_division=0)
+    for idx, cname in enumerate(c_names):
+        recalls[cname] = float(rec_list[idx])
+
+    # Compute ROC AUC
     try:
         if num_classes == 2:
             val_auc = float(roc_auc_score(all_labels, all_probs[:, 1]))
@@ -129,7 +152,7 @@ def validate(
     except Exception:
         val_auc = 0.5  # Fallback if single class present in subset
 
-    return val_loss, val_acc, val_auc
+    return val_loss, val_acc, val_f1, val_auc, recalls
 
 
 def plot_loss_curve(history: Dict[str, list], output_path: Path, title: str):
@@ -164,6 +187,7 @@ def run_training(
     transform_override = None,
     max_samples: int = None,
     use_class_weights: bool = True,
+    use_weighted_sampler: bool = True,
     debug: bool = False,
 ):
     """
@@ -222,8 +246,9 @@ def run_training(
     else:
         raise ValueError(f"Unrecognized dataset name '{cfg.dataset.name}' in config {config_path}")
 
-    # Class balance audit & dynamic class weighting setup
+    # Class balance audit & dynamic class weighting / sampling setup
     class_weights_tensor = None
+    sampler = None
     if hasattr(train_dataset, "df"):
         label_col = "grade" if "grade" in train_dataset.df.columns else "class_name"
         counts_dict = train_dataset.df[label_col].value_counts().to_dict()
@@ -239,7 +264,7 @@ def run_training(
         weights_np = np.array(weights_np, dtype=np.float32)
 
         ratio = max(counts_list) / max(min(counts_list), 1)
-        if ratio > 2.5 and use_class_weights:
+        if ratio > 1.5 and use_class_weights:
             class_weights_tensor = torch.tensor(weights_np, dtype=torch.float32).to(device)
             print(
                 f" -> [CLASS WEIGHTING ENABLED] Imbalance Ratio {ratio:.2f}:1 detected. "
@@ -247,16 +272,31 @@ def run_training(
                 flush=True,
             )
 
+        if ratio > 1.5 and use_weighted_sampler and max_samples is None:
+            class_to_idx = getattr(train_dataset, "class_to_idx", {name: i for i, name in enumerate(class_names)})
+            labels_list = [class_to_idx[str(g).strip()] for g in train_dataset.df[label_col]]
+            sample_weights = [weights_np[l] for l in labels_list]
+            sampler = torch.utils.data.WeightedRandomSampler(
+                weights=torch.tensor(sample_weights, dtype=torch.double),
+                num_samples=len(sample_weights),
+                replacement=True
+            )
+            print(f" -> [WEIGHTED SAMPLER ENABLED] Balanced batch sampling per epoch.", flush=True)
+
     if max_samples is not None and max_samples > 0:
         train_subset_indices = list(range(min(len(train_dataset), max_samples)))
         val_subset_indices = list(range(min(len(val_dataset), max_samples)))
         train_dataset = Subset(train_dataset, train_subset_indices)
         val_dataset = Subset(val_dataset, val_subset_indices)
+        sampler = None
         print(f"Subsetting data for run: Train={len(train_dataset)}, Val={len(val_dataset)}", flush=True)
     else:
         print(f"Full Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}", flush=True)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    if sampler is not None:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=0)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     # 3. Instantiate SwinClassifier with selected backbone, input_channels, num_classes
@@ -298,7 +338,7 @@ def run_training(
     best_val_acc = 0.0
     best_val_auc = 0.0
     best_epoch = 0
-    history = {"epoch": [], "train_loss": [], "val_loss": [], "val_acc": [], "val_auc": []}
+    history = {"epoch": [], "train_loss": [], "val_loss": [], "val_acc": [], "val_f1": [], "val_auc": []}
 
     # 6. Training Loop
     print(f"\n=== Starting Training ({epochs} Epochs) ===", flush=True)
@@ -308,11 +348,11 @@ def run_training(
         print(f"\nEpoch [{epoch}/{epochs}] - Current LR: {current_lr:.6f}", flush=True)
 
         # Train
-        train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
 
         # Validate
-        val_loss, val_acc, val_auc = validate(
-            model, val_loader, criterion, device, num_classes=cfg.dataset.num_classes
+        val_loss, val_acc, val_f1, val_auc, val_recalls = validate(
+            model, val_loader, criterion, device, num_classes=cfg.dataset.num_classes, class_names=cfg.dataset.class_names
         )
 
         # Step LR scheduler
@@ -326,15 +366,16 @@ def run_training(
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
+        history.setdefault("val_f1", []).append(val_f1)
         history["val_auc"].append(val_auc)
 
+        rec_str = " | ".join([f"Rec {k}: {v:.4f}" for k, v in val_recalls.items()])
         print(
             f"Epoch [{epoch}/{epochs}] ({epoch_duration:.1f}s) -> "
-            f"Train Loss: {train_loss:.4f} | "
-            f"Val Loss: {val_loss:.4f} | "
-            f"Val Acc: {val_acc * 100:.2f}% | "
-            f"Val AUC: {val_auc:.4f} | "
-            f"Next LR: {next_lr:.6f}",
+            f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc * 100:.2f}% | "
+            f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc * 100:.2f}% | "
+            f"Val F1: {val_f1:.4f} | Val AUC: {val_auc:.4f} | "
+            f"{rec_str} | Next LR: {next_lr:.6f}",
             flush=True,
         )
 
@@ -444,9 +485,11 @@ def main():
     parser.add_argument("--config", type=str, default="configs/kaggle_config.yaml", help="Path to config file")
     parser.add_argument("--epochs", type=int, default=None, help="Override number of epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Override batch size")
+    parser.add_argument("--learning_rate", "-lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--backbone", type=str, default=None, help="Override Swin backbone (e.g. swin_tiny_patch4_window7_224 or swin_base_patch4_window7_224)")
     parser.add_argument("--max_samples", type=int, default=None, help="Max dataset samples for debug/fast run")
     parser.add_argument("--no_class_weights", action="store_true", help="Disable automatic class-weighted loss")
+    parser.add_argument("--no_weighted_sampler", action="store_true", help="Disable weighted random sampler")
     parser.add_argument("--debug", action="store_true", help="Run short debug mode (3 epochs, 300 samples)")
 
     args = parser.parse_args()
@@ -454,9 +497,11 @@ def main():
         config_path=args.config,
         epochs_override=args.epochs,
         batch_size_override=args.batch_size,
+        learning_rate_override=args.learning_rate,
         backbone_override=args.backbone,
         max_samples=args.max_samples,
         use_class_weights=not args.no_class_weights,
+        use_weighted_sampler=not args.no_weighted_sampler,
         debug=args.debug,
     )
 
