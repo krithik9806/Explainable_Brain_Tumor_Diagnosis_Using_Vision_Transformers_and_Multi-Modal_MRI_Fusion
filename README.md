@@ -1,5 +1,10 @@
 # Explainable Brain Tumor Diagnosis Using Vision Transformers and Multi-Modal MRI Fusion
 
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![PyTorch 2.5+](https://img.shields.io/badge/PyTorch-2.5%2B-orange.svg)](https://pytorch.org/)
+[![Vision Transformer](https://img.shields.io/badge/Backbone-Swin_Transformer-green.svg)](https://github.com/microsoft/Swin-Transformer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 An explainable deep learning pipeline for brain tumor classification from multi-modal MRI scans, built on a **Swin Transformer** backbone with integrated visual explainability (Grad-CAM / Attention Rollout).
 
 ---
@@ -12,14 +17,13 @@ An explainable deep learning pipeline for brain tumor classification from multi-
 - [System Architecture](#system-architecture)
 - [Dataset](#dataset)
 - [Methodology](#methodology)
+- [Experimental Results](#experimental-results)
+- [Explainability (XAI)](#explainability-xai)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Project Structure](#project-structure)
-- [Results](#results)
-- [Explainability](#explainability)
 - [Tech Stack](#tech-stack)
 - [Roadmap](#roadmap)
-- [Contributing](#contributing)
 - [License](#license)
 - [Citation](#citation)
 - [Acknowledgements](#acknowledgements)
@@ -32,29 +36,27 @@ Brain tumors are among the most life-threatening neurological conditions, and ea
 
 This project builds a deep learning system that:
 
-1. **Fuses multiple MRI modalities** into a single, information-rich input.
-2. Classifies the tumor type using a **Swin Transformer**, a state-of-the-art hierarchical vision transformer that captures both local detail and global context efficiently.
-3. Produces **visual explanations** (heatmaps) for every prediction, so clinicians can verify that the model is focusing on medically relevant regions rather than spurious artifacts.
-
-The goal is a diagnostic-support tool that is both **accurate** and **trustworthy** — not a black box.
+1. **Fuses multiple MRI modalities** (T1, T1ce, T2, FLAIR) into a single, 4-channel stacked input representation (early fusion).
+2. Classifies tumor grade/type using a **Swin Transformer**, a state-of-the-art hierarchical vision transformer that captures both local detail and global context efficiently.
+3. Addresses severe class imbalance (HGG vs LGG) using **Class-Weighted Cross-Entropy Loss** and **Weighted Random Sampling**.
+4. Produces **visual explanations** (heatmaps via Grad-CAM and Swin Attention Rollout) for every prediction, enabling clinicians to verify that the model relies on true tumor tissue.
 
 ---
 
 ## Key Features
 
-- **Multi-modal MRI fusion** — combines T1, T1c, T2, and FLAIR sequences for richer input representation.
-- **Swin Transformer backbone** — hierarchical shifted-window self-attention for efficient, high-resolution medical image classification.
-- **Transfer learning** — fine-tunes ImageNet-pretrained Swin weights on brain MRI data.
-- **Explainable AI (XAI)** — Grad-CAM and Attention Rollout overlays to visualize model reasoning.
-- **Modular pipeline** — clean separation of preprocessing, fusion, model, training, and explainability code.
-- **Reproducible experiments** — configuration-driven training with logged metrics.
-- **Deployment-ready demo** — simple Streamlit/Flask app for uploading scans and viewing predictions with heatmaps.
+- **Multi-Modal MRI Fusion** — Stacked 4-channel fusion (T1, T1ce, T2, FLAIR) for comprehensive lesion characterization.
+- **Hierarchical Swin Transformer** — Shifted-window self-attention backbones (`swin_tiny` and `swin_base`) adapted for multi-channel inputs.
+- **Pretrained Stem Adaptation** — Channel-wise weight mean initialization for the 4th channel stem projection layer, preserving scale and stability during transfer learning.
+- **Class-Imbalance Mitigation** — Loss weighting combined with `WeightedRandomSampler` mini-batch balancing, boosting minority (LGG) recall from 0.00% to **87.50%**.
+- **Visual Explainability (XAI)** — Integrated Grad-CAM and Swin Attention Rollout overlays for transparent model reasoning.
+- **Mentor-Ready Documentation** — Complete epoch-by-epoch CSV logs, metrics reports, and training curves archived under [`results/training_documentation/`](results/training_documentation/FINAL_RESULTS_SUMMARY.md).
 
 ---
 
 ## Project Motivation
 
-Deep learning models achieve strong accuracy on medical imaging tasks, but clinical adoption is limited by their **lack of transparency**. A model that predicts "glioma" with 92% confidence is not clinically useful unless a radiologist can see *why* it made that decision. This project directly addresses that gap by pairing a high-performing Swin Transformer classifier with interpretable visual explanations, aiming to bridge the trust gap between AI systems and clinical practitioners.
+Deep learning models achieve strong accuracy on medical imaging tasks, but clinical adoption is limited by their **lack of transparency**. A model that predicts "HGG" or "Glioma" with high confidence is not clinically actionable unless a radiologist can see *why* it made that decision. This project directly addresses that gap by pairing high-performing Swin Transformer classifiers with interpretable visual explanations, bridging the trust gap between AI systems and clinical practitioners.
 
 ---
 
@@ -62,187 +64,159 @@ Deep learning models achieve strong accuracy on medical imaging tasks, but clini
 
 ```mermaid
 flowchart TD
-    A[Raw MRI scans<br/>T1, T1c, T2, FLAIR] --> B[Preprocessing<br/>Skull strip, register, normalize, resize]
-    B --> C[Multi-modal fusion<br/>Channel stacking / feature-level fusion]
-    C --> D[Swin Transformer<br/>Backbone + classification head]
-    D --> E[Tumor classification<br/>Softmax output]
-    D --> F[Explainability<br/>Grad-CAM / Attention Rollout]
+    A["Raw MRI Scans<br/>(T1, T1ce, T2, FLAIR)"] --> B["Preprocessing & Slice Extraction<br/>Skull stripping, registration, normalization, 224x224 resizing"]
+    B --> C["Multi-Modal Early Fusion<br/>Stacked 4-Channel Input Tensor [4, 224, 224]"]
+    C --> D["Swin Transformer Backbone<br/>(Stem Adaptation + Hierarchical Attention)"]
+    D --> E["Classification Head<br/>Logits: HGG vs LGG / 4-Class Kaggle"]
+    D --> F["Explainability Engine<br/>Grad-CAM & Swin Attention Rollout"]
+    E --> G["Diagnostic Metrics & Evaluation"]
+    F --> H["Saliency Overlays & Heatmaps"]
 ```
 
-The pipeline moves from raw multi-sequence MRI input through preprocessing and fusion, into the Swin Transformer backbone, which produces both a tumor classification and a visual explanation for that prediction.
 ---
 
 ## Dataset
 
-This project is designed to work with public multi-modal brain MRI datasets, such as:
+This project supports multi-modal benchmark datasets and single-modality clinical classification sets:
 
-- **BraTS (Brain Tumor Segmentation Challenge)** — multi-institutional dataset with T1, T1c, T2, and FLAIR sequences and expert-annotated tumor sub-regions.
-- **Kaggle Brain Tumor MRI Dataset** — classification-oriented dataset (glioma, meningioma, pituitary, no tumor).
+- **BraTS 2020 (Brain Tumor Segmentation Challenge)** — 3,920 multi-modal MRI slices across 140 patients (79.3% HGG / 20.7% LGG). Split strictly at the **patient level** (70% train / 15% val / 15% test) to prevent data leakage across slices.
+- **Kaggle Brain Tumor MRI Dataset** — 4-class single-modality dataset (Glioma, Meningioma, Pituitary, No Tumor) with 1,600 held-out test slices.
 
-> **Note:** Datasets are not included in this repository due to size and licensing restrictions. Please download them from their official sources and place them under `data/raw/` following the structure described in [`data/README.md`](data/README.md).
-
-| Class       | Description                              |
-|-------------|-------------------------------------------|
-| Glioma      | Tumor arising from glial cells            |
-| Meningioma  | Tumor arising from the meninges           |
-| Pituitary   | Tumor in the pituitary gland               |
-| No Tumor    | Healthy control scan                       |
+> [!NOTE]
+> Raw data is not stored in this repository due to licensing restrictions. Download instructions and dataset split specifications are located in [`data/README.md`](data/README.md) and [`data/processed/brats_splits.csv`](data/processed/brats_splits.csv).
 
 ---
 
 ## Methodology
 
-1. **Preprocessing** — skull stripping, spatial registration across modalities, intensity normalization, and resizing to 224×224.
-2. **Fusion** — modalities are stacked as a 4-channel tensor (early fusion) or encoded separately and merged at the feature level (late fusion).
-3. **Modeling** — a pretrained Swin Transformer (`swin_tiny` / `swin_base`) is fine-tuned with a modified input stem (4 channels) and a custom classification head.
-4. **Training** — cross-entropy loss, AdamW optimizer, cosine learning-rate schedule, data augmentation (flips, rotations, elastic deformation), and patient-level train/validation/test splitting to avoid data leakage.
-5. **Evaluation** — accuracy, precision, recall, F1-score, AUC, and confusion matrix.
-6. **Explainability** — Grad-CAM and Attention Rollout heatmaps overlaid on the original MRI slices.
+1. **Preprocessing & Registration** — Modal registration, intensity normalization, and 224×224 spatial resizing across sequence volumes.
+2. **Early Fusion Stem Adaptation** — Modalities stacked as a `[4, 224, 224]` tensor. Pretrained ImageNet RGB weights copied for channels 0–2, and 4th channel (FLAIR) initialized with channel-wise weight mean (`old_weights.mean(dim=1)`).
+3. **Imbalance-Aware Training** — AdamW optimizer with cosine learning rate scheduling ($3 \times 10^{-5}$ for Swin-Tiny, $1.5 \times 10^{-5}$ for Swin-Base), loss weights ($2.45$ LGG / $0.628$ HGG), and balanced `WeightedRandomSampler` batching.
+4. **Evaluation Benchmark** — Evaluated on held-out test sets using Accuracy, Precision, Recall, F1-Score, and ROC-AUC.
+
+---
+
+## Experimental Results
+
+Below are the final, verified test set evaluation results across all primary model configurations:
+
+| Model Architecture | Dataset & Experiment | Epochs | Best Val Accuracy | Test Accuracy | Test F1-Score (Target / Macro) | Test AUC | Class Imbalance Handling | Status |
+|---|---|---:|---:|---:|---:|---:|---|---|
+| **Swin-Tiny** | Kaggle (4-Class Single-Modality) | — | — | **87.75%** | **0.8751** (Macro) | **0.9759** (OvR) | Balanced Split | Baseline |
+| **Swin-Tiny** | BraTS (2-Class Multi-Modal Fusion) | 20 | **87.93%** | **86.73%** | **0.9642** (HGG) / **0.7719** (Macro) | **0.9555** | Class Weights + Sampler | **Fixed** (LGG Rec: 85.71%) |
+| **Swin-Base** | BraTS (2-Class Multi-Modal Fusion) | 20 | **90.65%** | **89.46%** | **0.9727** (HGG) / **0.8169** (Macro) | **0.9702** | Class Weights + Sampler | **Top Model** (LGG Rec: 87.50%) |
+
+### Detailed Test Confusion Matrix & Recall Breakdown (Swin-Base BraTS):
+* **Held-Out Test Set:** 588 total 2D slices (112 LGG, 476 HGG).
+* **Confusion Matrix:** `[[98, 14], [12, 464]]`
+* **LGG Recall (Minority Class):** **87.50%** (98 / 112) — *improved from 0.00% collapse baseline*.
+* **HGG Recall (Majority Class):** **97.48%** (464 / 476).
+
+> [!IMPORTANT]
+> Comprehensive epoch-by-epoch CSV data, console logs, loss/accuracy curves, and mentor documentation are archived in [`results/training_documentation/FINAL_RESULTS_SUMMARY.md`](results/training_documentation/FINAL_RESULTS_SUMMARY.md).
+
+---
+
+## Explainability (XAI)
+
+Every model prediction can be visualized using feature attribution heatmaps:
+
+- **Grad-CAM** — Gradient-based class activation mapping targeting the final Swin Transformer stage layer norm / block outputs.
+- **Swin Attention Rollout** — Aggregates self-attention weights across shifted window blocks to produce normalized $224 \times 224$ saliency maps.
+
+Saved side-by-side comparison overlays are available in [`results/explainability_comparison/`](results/explainability_comparison/) and [`results/gradcam_brats/`](results/gradcam_brats/).
 
 ---
 
 ## Installation
 
-\```bash
+```bash
 # Clone the repository
-git clone https://github.com/<your-username>/explainable-brain-tumor-swin.git
-cd explainable-brain-tumor-swin
+git clone https://github.com/krithik9806/Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_Fusion.git
+cd Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_Fusion
 
-# Create and activate a virtual environment
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate      # On Windows: venv\Scripts\activate
+venv\Scripts\activate      # On Linux/macOS: source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-\```
-
-### Requirements
-
-- Python 3.9+
-- PyTorch >= 2.0
-- torchvision / timm
-- numpy, pandas, scikit-learn
-- opencv-python, nibabel, SimpleITK (for MRI/NIfTI handling)
-- matplotlib, seaborn
-- grad-cam (pytorch-grad-cam)
-- streamlit (for the demo app)
-
-Full list in [`requirements.txt`](requirements.txt).
+```
 
 ---
 
 ## Usage
 
-### 1. Preprocess the dataset
-\```bash
+### 1. Preprocess Dataset
+```bash
 python src/preprocessing/prepare_data.py --input_dir data/raw --output_dir data/processed
-\```
+```
 
-### 2. Train the model
-\```bash
-python src/train.py --config configs/swin_config.yaml
-\```
+### 2. Train Swin-Base Fusion Model (20 Epochs)
+```bash
+python src/train.py --config configs/brats_fusion_config.yaml --epochs 20 --backbone swin_base_patch4_window7_224 --learning_rate 0.000015
+```
 
-### 3. Evaluate on the test set
-\```bash
-python src/evaluate.py --checkpoint checkpoints/best_model.pth
-\```
+### 3. Evaluate Checkpoint on Test Set
+```bash
+python src/evaluate.py -c checkpoints/brats_base_best_model.pth -cfg configs/brats_fusion_config.yaml -p brats_base
+```
 
-### 4. Generate explainability heatmaps
-\```bash
-python src/explain.py --checkpoint checkpoints/best_model.pth --image_path samples/example.nii
-\```
-
-### 5. Launch the demo app
-\```bash
-streamlit run app/app.py
-\```
+### 4. Generate Visual Explainability Overlays
+```bash
+python src/explain.py -c checkpoints/brats_base_best_model.pth -i data/processed/brats/test_sample.npz
+```
 
 ---
 
 ## Project Structure
 
-```
-explainable-brain-tumor-swin/
-├── data/
-│   ├── raw/                  # Original downloaded datasets (not included)
-│   └── processed/            # Preprocessed and fused MRI tensors
-├── src/
-│   ├── preprocessing/        # Skull stripping, registration, normalization
-│   ├── fusion/                # Multi-modal fusion logic
-│   ├── models/                 # Swin Transformer model definitions
-│   ├── train.py                 # Training loop
-│   ├── evaluate.py              # Evaluation metrics
-│   └── explain.py               # Grad-CAM / Attention Rollout
-├── app/
-│   └── app.py                    # Streamlit demo application
-├── configs/
-│   └── swin_config.yaml           # Training hyperparameters
-├── checkpoints/                    # Saved model weights
-├── notebooks/                       # Exploratory analysis notebooks
+```text
+Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_Fusion/
+├── configs/                       # Experiment YAML configurations
+│   ├── base_config.yaml
+│   ├── brats_fusion_config.yaml  # Multi-modal fusion parameters
+│   └── kaggle_config.yaml        # Single-modality 4-class parameters
+├── src/                           # Core source modules
+│   ├── data/                      # PyTorch Dataset definitions (BraTS & Kaggle)
+│   ├── models/                    # Swin Transformer & Stem adaptation code
+│   ├── preprocessing/             # NIfTI slice processing & modality fusion
+│   ├── utils/                     # Config loaders & logging utilities
+│   ├── train.py                   # Main config-driven training loop
+│   ├── evaluate.py                # Test set evaluation & plot generation
+│   └── explain.py                 # Grad-CAM & Swin Attention Rollout
+├── results/                       # Generated confusion matrices, ROC curves, & XAI overlays
+│   └── training_documentation/   # Archived mentor documentation & epoch CSV logs
+│       ├── FINAL_RESULTS_SUMMARY.md
+│       ├── RUN_A_SWIN_TINY_BRATS/
+│       └── RUN_B_SWIN_BASE_BRATS/
+├── checkpoints/                   # Trained model weights (.pth)
 ├── requirements.txt
 ├── LICENSE
 └── README.md
 ```
----
-
-## Results
-
-| Model              | Accuracy | Precision | Recall | F1-score | AUC   |
-|--------------------|----------|-----------|--------|----------|-------|
-| Swin-Tiny (single-modality) | 87.75% | 0.8908 | 0.8775 | 0.8751 | 0.9759 |
-| Swin-Tiny (multi-modal fusion) | 80.95% | 0.8095 | 1.0000 | 0.8947 | 0.5622 |
-| Swin-Base (multi-modal fusion) | 56.29% | 0.9101 | 0.5105 | 0.6541 | 0.7315 |
-
-> Evaluation results computed strictly on held-out test splits (`split == 'test'`). For the multi-class Kaggle single-modality experiment, One-vs-Rest (OvR) macro-averaged AUC and macro-averaged precision/recall/F1 are reported. Confusion matrix and ROC curve plots for all models are saved under [`results/`](results/).
-
----
-
-## Explainability
-
-Every prediction is accompanied by a heatmap that highlights the regions of the MRI the model relied on most heavily. This is generated using:
-
-- **Grad-CAM** — gradient-based class activation mapping adapted for transformer architectures.
-- **Attention Rollout** — aggregates self-attention weights across all Swin Transformer layers to produce a saliency map.
-
-Example output (prediction + heatmap overlay) will be shown here:
-
-\```
-[ MRI Slice ]   [ Predicted: Glioma, 94.2% ]   [ Grad-CAM Heatmap Overlay ]
-\```
 
 ---
 
 ## Tech Stack
 
-- **Deep Learning:** PyTorch, timm
-- **Vision Backbone:** Swin Transformer
-- **Explainability:** pytorch-grad-cam, custom Attention Rollout
-- **Medical Imaging:** nibabel, SimpleITK, OpenCV
-- **Deployment:** Streamlit / Flask
-- **Experiment Tracking:** TensorBoard / Weights & Biases (optional)
+- **Framework:** PyTorch, `timm` (PyTorch Image Models)
+- **Vision Architecture:** Swin Transformer (`swin_tiny`, `swin_base`)
+- **Explainability:** `pytorch-grad-cam`, Custom Swin Attention Rollout
+- **Medical Image I/O:** `nibabel`, `SimpleITK`, OpenCV, NumPy
+- **Metrics & Visualization:** `scikit-learn`, Matplotlib, Seaborn
 
 ---
 
 ## Roadmap
 
-- [ ] Add segmentation head (tumor boundary delineation) alongside classification
-- [ ] Support 3D volumetric Swin Transformer (Swin-UNETR style)
-- [ ] Add SHAP-based feature attribution
-- [ ] Dockerize the full pipeline
-- [ ] Deploy demo app publicly (e.g., Hugging Face Spaces)
-
----
-
-## Contributing
-
-Contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes (`git commit -m "Add your feature"`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Open a Pull Request
+- [x] Multi-modal 4-channel MRI early fusion stem adaptation
+- [x] Class imbalance resolution via weighted loss & balanced sampling
+- [x] Swin-Base fine-tuning optimization (89.46% test accuracy, 0.9702 AUC)
+- [x] Grad-CAM & Attention Rollout explainability pipeline
+- [x] Full mentor-ready documentation & training history archiving
+- [ ] 3D Volumetric Swin Transformer support (Swin-UNETR)
+- [ ] Deployment-ready web application (Streamlit / Web UI)
 
 ---
 
@@ -254,25 +228,23 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ## Citation
 
-If you use this work in your research, please cite it as:
+If you use this project in your research or coursework, please cite it as:
 
-\```bibtex
-@misc{brain_tumor_swin_2026,
+```bibtex
+@misc{krithik_brain_tumor_swin_2026,
   title  = {Explainable Brain Tumor Diagnosis Using Vision Transformers and Multi-Modal MRI Fusion},
-  author = {Your Name},
+  author = {Krithik},
   year   = {2026},
-  howpublished = {\url{https://github.com/<your-username>/explainable-brain-tumor-swin}}
+  howpublished = {\url{https://github.com/krithik9806/Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_Fusion}}
 }
-\```
+```
 
 ---
 
 ## Acknowledgements
 
-- The **BraTS Challenge** organizers for providing multi-modal MRI benchmark datasets.
-- The original **Swin Transformer** authors (Liu et al., 2021) for the backbone architecture.
-- The open-source explainable AI community for Grad-CAM and Attention Rollout implementations.
+- The **BraTS Challenge** organizers for providing multi-modal MRI benchmarks.
+- The **Swin Transformer** team (Liu et al., 2021) for the backbone architecture.
+- Open-source PyTorch medical imaging and XAI community.
 
----
-
-*Disclaimer: This project is intended for research and educational purposes only and is not a certified medical diagnostic tool. It should not be used for actual clinical decision-making without appropriate regulatory approval and validation.*
+*Disclaimer: This repository is intended for research and educational purposes only and is not a certified clinical diagnostic tool.*
