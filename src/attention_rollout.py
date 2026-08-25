@@ -106,21 +106,17 @@ class SwinAttentionRollout:
         if len(self.attn_maps) == 0:
             raise RuntimeError("No attention maps were captured by forward hooks.")
 
-        # Stage grid dimensions for swin_tiny_patch4_window7_224 (12 blocks)
-        # Stage 0: 2 blocks (56x56 grid)
-        # Stage 1: 2 blocks (28x28 grid)
-        # Stage 2: 6 blocks (14x14 grid)
-        # Stage 3: 2 blocks (7x7 grid)
-        grid_sizes = [
-            (56, 56), (56, 56),
-            (28, 28), (28, 28),
-            (14, 14), (14, 14), (14, 14), (14, 14), (14, 14), (14, 14),
-            (7, 7), (7, 7),
-        ]
+        # Dynamically determine stage grid dimensions based on backbone architecture
+        grid_sizes = []
+        timm_backbone = self.model.backbone.backbone
+        stage_dims = [(56, 56), (28, 28), (14, 14), (7, 7)]
+        if hasattr(timm_backbone, "layers"):
+            for s_idx, stage in enumerate(timm_backbone.layers):
+                dim = stage_dims[min(s_idx, len(stage_dims) - 1)]
+                num_blocks = len(stage.blocks)
+                grid_sizes.extend([dim] * num_blocks)
 
-        # Handle mismatch if model backbone varies
         if len(self.attn_maps) != len(grid_sizes):
-            # Fallback estimation
             grid_sizes = [(7, 7)] * len(self.attn_maps)
 
         spatial_maps = []

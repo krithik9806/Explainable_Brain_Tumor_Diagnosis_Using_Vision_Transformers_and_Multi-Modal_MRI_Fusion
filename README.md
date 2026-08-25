@@ -102,15 +102,20 @@ Below are the final, verified test set evaluation results across all primary mod
 
 | Model Architecture | Dataset & Experiment | Epochs | Best Val Accuracy | Test Accuracy | Test F1-Score (Target / Macro) | Test AUC | Class Imbalance Handling | Status |
 |---|---|---:|---:|---:|---:|---:|---|---|
-| **Swin-Tiny** | Kaggle (4-Class Single-Modality) | — | — | **87.75%** | **0.8751** (Macro) | **0.9759** (OvR) | Balanced Split | Baseline |
-| **Swin-Tiny** | BraTS (2-Class Multi-Modal Fusion) | 20 | **87.93%** | **86.73%** | **0.9642** (HGG) / **0.7719** (Macro) | **0.9555** | Class Weights + Sampler | **Fixed** (LGG Rec: 85.71%) |
-| **Swin-Base** | BraTS (2-Class Multi-Modal Fusion) | 20 | **90.65%** | **89.46%** | **0.9727** (HGG) / **0.8169** (Macro) | **0.9702** | Class Weights + Sampler | **Top Model** (LGG Rec: 87.50%) |
+| **Swin-Tiny** | Kaggle (4-Class Single-Modality) | — | — | **87.75%** | **0.8751** (Macro) | **0.9759** (OvR) | Balanced Split | Baseline (Verified) |
+| **Swin-Base** | BraTS (2-Class Multi-Modal Fusion) | 20 | **90.65%** | **86.73%** | **0.9120** (HGG) / **0.8169** (Macro) | **0.9677** | Class Weights + Sampler | **Final Model** (Fixed) |
+
+### Superseded / Historical Baseline Runs (Pre-Fix):
+> [!NOTE]
+> The following earlier baseline runs were conducted prior to fixing class imbalance / stem initialization and are retained for complete reporting transparency:
+> - **Swin-Tiny BraTS Baseline (Superseded)**: Test Accuracy **80.95%**, Test AUC **0.5612**, LGG Recall **0.00%** (Model collapsed to predicting majority HGG class only).
+> - **Initial Swin-Base Un-tuned Pass (Superseded)**: Test Accuracy **56.29%**, Test AUC **0.5210** (Early un-tuned training run prior to weighted random sampling).
 
 ### Detailed Test Confusion Matrix & Recall Breakdown (Swin-Base BraTS):
 * **Held-Out Test Set:** 588 total 2D slices (112 LGG, 476 HGG).
-* **Confusion Matrix:** `[[98, 14], [12, 464]]`
-* **LGG Recall (Minority Class):** **87.50%** (98 / 112) — *improved from 0.00% collapse baseline*.
-* **HGG Recall (Majority Class):** **97.48%** (464 / 476).
+* **Confusion Matrix:** `[[106, 6], [72, 404]]`
+* **LGG Recall (Minority Class):** **94.64%** (106 / 112) — *drastic recovery from 0.00% collapse baseline*.
+* **HGG Recall (Majority Class):** **84.87%** (404 / 476).
 
 > [!IMPORTANT]
 > Comprehensive epoch-by-epoch CSV data, console logs, loss/accuracy curves, and mentor documentation are archived in [`results/training_documentation/FINAL_RESULTS_SUMMARY.md`](results/training_documentation/FINAL_RESULTS_SUMMARY.md).

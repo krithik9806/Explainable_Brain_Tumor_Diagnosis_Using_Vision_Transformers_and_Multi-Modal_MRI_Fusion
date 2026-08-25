@@ -99,15 +99,22 @@ def load_model_from_config(
     if not ckpt_file.exists():
         raise FileNotFoundError(f"Checkpoint file not found at: {ckpt_file}")
 
+    checkpoint = torch.load(ckpt_file, map_location=device, weights_only=False)
+
+    backbone_name = (
+        checkpoint.get("backbone")
+        if isinstance(checkpoint, dict) and "backbone" in checkpoint
+        else cfg.model.backbone
+    )
+
     model = build_swin_classifier(
-        backbone_name=cfg.model.backbone,
+        backbone_name=backbone_name,
         input_channels=cfg.dataset.input_channels,
         num_classes=cfg.dataset.num_classes,
         pretrained=False,
     )
 
-    checkpoint = torch.load(ckpt_file, map_location=device, weights_only=False)
-    if "model_state_dict" in checkpoint:
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
         model.load_state_dict(checkpoint)
@@ -116,7 +123,7 @@ def load_model_from_config(
     model.eval()
 
     print(f"=== Successfully Loaded Model from {ckpt_file.name} ===", flush=True)
-    print(f"Backbone: {cfg.model.backbone} | Channels: {cfg.dataset.input_channels} | Classes: {cfg.dataset.class_names}", flush=True)
+    print(f"Backbone: {backbone_name} | Channels: {cfg.dataset.input_channels} | Classes: {cfg.dataset.class_names}", flush=True)
 
     return model, cfg
 

@@ -1,0 +1,56 @@
+================================================================================
+=== FINAL EVALUATION REPORT & PER-CLASS BREAKDOWN ===
+================================================================================
+
+--------------------------------------------------------------------------------
+1. BraTS Multi-Modal MRI Fusion Model (Swin-Base: swin_base_patch4_window7_224)
+--------------------------------------------------------------------------------
+Evaluating BraTS test set (588 samples)...
+Overall Test Accuracy: 86.73% (0.8673)
+Binary F1-Score (HGG): 0.9120
+Macro F1-Score:        0.8215
+Binary Precision:      0.9854
+Binary Recall:         0.8487
+ROC AUC:               0.9677
+
+Confusion Matrix [LGG, HGG]:
+[[106   6]
+ [ 72 404]]
+
+Classification Report (Per-Class Precision & Recall):
+              precision    recall  f1-score   support
+
+         LGG     0.5955    0.9464    0.7310       112
+         HGG     0.9854    0.8487    0.9120       476
+
+    accuracy                         0.8673       588
+   macro avg     0.7904    0.8976    0.8215       588
+weighted avg     0.9111    0.8673    0.8775       588
+
+--------------------------------------------------------------------------------
+2. Kaggle Single-Modality Model (Swin-Tiny: swin_tiny_patch4_window7_224)
+--------------------------------------------------------------------------------
+Evaluating Kaggle test set (1600 samples)...
+Overall Test Accuracy: 87.75% (0.8775)
+Macro F1-Score:        0.8751
+Macro Precision:      0.8908
+Macro Recall:         0.8775
+ROC AUC (OvR):         0.9759
+
+Confusion Matrix:
+[[274  87  35   4]
+ [  2 356  23  19]
+ [  0   2 398   0]
+ [  2  22   0 376]]
+
+Classification Report (Per-Class Precision & Recall):
+              precision    recall  f1-score   support
+
+      glioma     0.9856    0.6850    0.8083       400
+  meningioma     0.7623    0.8900    0.8212       400
+     notumor     0.8728    0.9950    0.9299       400
+   pituitary     0.9424    0.9400    0.9412       400
+
+    accuracy                         0.8775      1600
+   macro avg     0.8908    0.8775    0.8751      1600
+weighted avg     0.8908    0.8775    0.8751      1600
