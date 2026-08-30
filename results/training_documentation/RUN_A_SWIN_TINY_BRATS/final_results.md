@@ -2,6 +2,7 @@
 
 ## Experiment Overview
 - **Model:** Swin-Tiny (`swin_tiny_patch4_window7_224`)
+- **Total Parameters:** **27,520,380** (~**27.52 Million**)
 - **Dataset:** BraTS 2020 Multi-Modal MRI Fusion
 - **Training Epochs:** 20
 - **Best Validation Epoch:** Epoch 17

@@ -2,6 +2,7 @@
 
 ## Experiment Overview
 - **Model:** Swin-Base (`swin_base_patch4_window7_224`)
+- **Total Parameters:** **86,746,478** (~**86.75 Million**)
 - **Dataset:** BraTS 2020 Multi-Modal MRI Fusion
 - **Training Epochs:** 20
 - **Best Validation Epoch:** Epoch 15 (First reached 90.65%) / Epoch 17 (Lowest Val Loss: 0.2366)
