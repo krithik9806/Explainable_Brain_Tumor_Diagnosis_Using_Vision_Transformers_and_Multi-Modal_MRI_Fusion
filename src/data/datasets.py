@@ -88,9 +88,21 @@ class BraTSDataset(Dataset):
             raise ValueError(f"No records found for split '{split}' in {self.csv_path}")
 
     def __len__(self) -> int:
+        """
+        Returns total number of samples in the filtered split.
+        """
         return len(self.df)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Loads and returns a 4-channel fused MRI tensor and its target class label.
+
+        Args:
+            idx (int): Sample index.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Fused MRI tensor [4, 224, 224] and integer label tensor.
+        """
         row = self.df.iloc[idx]
         file_path = resolve_file_path(row["file_path"])
         grade_str = str(row["grade"]).strip()
@@ -102,7 +114,7 @@ class BraTSDataset(Dataset):
         # Load .npz file
         npz_data = np.load(file_path)
 
-        # Apply Day 11 Early Fusion to produce [4, 224, 224] tensor
+        # Apply Early Fusion to produce [4, 224, 224] tensor
         fused_tensor = fuse_brats_modalities(
             t1=npz_data["t1"],
             t1ce=npz_data["t1ce"],
@@ -162,9 +174,21 @@ class KaggleDataset(Dataset):
             raise ValueError(f"No records found for split '{split}' in {self.csv_path}")
 
     def __len__(self) -> int:
+        """
+        Returns total number of samples in the filtered split.
+        """
         return len(self.df)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Loads and returns a 3-channel RGB-expanded MRI tensor and its target class label.
+
+        Args:
+            idx (int): Sample index.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: MRI tensor [3, 224, 224] and integer label tensor.
+        """
         row = self.df.iloc[idx]
         file_path = resolve_file_path(row["file_path"])
         class_str = str(row["class_name"]).strip()

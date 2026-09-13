@@ -137,7 +137,7 @@ def process_brats_dataset(
         slice_files = sorted(list(p_dir.glob("*.npz")))
         for s_file in slice_files:
             data = np.load(s_file)
-            
+
             # Load raw modalities & mask
             modalities = {m: data[m] for m in ['t1', 't1ce', 't2', 'flair']}
             mask = data['mask']
@@ -252,6 +252,9 @@ def process_kaggle_dataset(
 
 
 def main():
+    """
+    Main CLI entrypoint for dataset normalization and bilinear resizing.
+    """
     parser = argparse.ArgumentParser(
         description="Normalize and resize BraTS and Kaggle brain MRI datasets.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -278,44 +281,52 @@ def main():
         "--kaggle_out",
         type=str,
         default="data/processed/kaggle_normalized",
-        help="Output directory for normalized Kaggle images.",
+        help="Output directory for normalized Kaggle slices.",
     )
     parser.add_argument(
-        "--target_size",
+        "--size",
         type=int,
         nargs=2,
         default=[224, 224],
-        help="Target (width, height) spatial dimension.",
+        help="Target spatial resolution [height, width].",
+    )
+    parser.add_argument(
+        "--skip_brats",
+        action="store_true",
+        help="Skip BraTS processing.",
+    )
+    parser.add_argument(
+        "--skip_kaggle",
+        action="store_true",
+        help="Skip Kaggle processing.",
     )
 
     args = parser.parse_args()
-    target_size = (args.target_size[0], args.target_size[1])
+    target_size = tuple(args.size)
 
-    project_root = Path(__file__).resolve().parents[2]
-    brats_in = project_root / args.brats_in
-    brats_out = project_root / args.brats_out
-    kaggle_in = project_root / args.kaggle_in
-    kaggle_out = project_root / args.kaggle_out
-
-    start_time = time.time()
-    print("=" * 60)
-    print("=== DATASET NORMALIZATION AND RESIZING PIPELINE ===")
+    print("============================================================")
+    print("=== DATASET NORMALIZATION & RESIZING PIPELINE (DAY 8) ===")
+    print("============================================================")
     print(f"Target Resolution: {target_size}")
-    print("=" * 60)
+    print(f"BraTS In:  {args.brats_in}  --> Out: {args.brats_out}")
+    print(f"Kaggle In: {args.kaggle_in} --> Out: {args.kaggle_out}")
+    print("============================================================\n")
 
-    # 1. Process BraTS
-    brats_res = process_brats_dataset(brats_in, brats_out, target_size=target_size)
+    brats_res = {"stats": []}
+    if not args.skip_brats:
+        brats_res = process_brats_dataset(
+            input_dir=args.brats_in,
+            output_dir=args.brats_out,
+            target_size=target_size,
+        )
 
-    # 2. Process Kaggle
-    kaggle_res = process_kaggle_dataset(kaggle_in, kaggle_out, target_size=target_size)
-
-    elapsed = time.time() - start_time
-    print("\n" + "=" * 60)
-    print("=== NORMALIZATION COMPLETE ===")
-    print(f"BraTS Processed Slices: {brats_res['processed_slices']:,}")
-    print(f"Kaggle Processed Images: {kaggle_res['processed_images']:,}")
-    print(f"Total Execution Time: {elapsed:.2f} seconds")
-    print("=" * 60)
+    kaggle_res = {"stats": []}
+    if not args.skip_kaggle:
+        kaggle_res = process_kaggle_dataset(
+            input_dir=args.kaggle_in,
+            output_dir=args.kaggle_out,
+            target_size=target_size,
+        )
 
     # Print Intensity Statistics
     print("\n" + "=" * 60)
@@ -326,8 +337,14 @@ def main():
     for s in all_stats:
         print(f"\nDataset: {s['dataset']} | Sample: {s['sample']} | Item: {s['item']}")
         b, a = s["before"], s["after"]
-        print(f"  BEFORE -> Shape: {b['shape']} | Min: {b['min']:.4f} | Max: {b['max']:.4f} | Mean: {b['mean']:.4f} | Std: {b['std']:.4f}")
-        print(f"  AFTER  -> Shape: {a['shape']} | Min: {a['min']:.4f} | Max: {a['max']:.4f} | Mean: {a['mean']:.4f} | Std: {a['std']:.4f}")
+        print(
+            f"  BEFORE -> Shape: {b['shape']} | Min: {b['min']:.4f} | Max: {b['max']:.4f} | "
+            f"Mean: {b['mean']:.4f} | Std: {b['std']:.4f}"
+        )
+        print(
+            f"  AFTER  -> Shape: {a['shape']} | Min: {a['min']:.4f} | Max: {a['max']:.4f} | "
+            f"Mean: {a['mean']:.4f} | Std: {a['std']:.4f}"
+        )
 
     print("=" * 60)
 

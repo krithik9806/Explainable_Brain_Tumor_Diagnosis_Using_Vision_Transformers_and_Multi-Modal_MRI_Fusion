@@ -18,21 +18,33 @@ class ConfigDict(dict):
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        Initializes ConfigDict and recursively wraps nested dictionaries.
+        """
         super().__init__(*args, **kwargs)
         for key, value in self.items():
             if isinstance(value, dict) and not isinstance(value, ConfigDict):
                 self[key] = ConfigDict(value)
 
     def __getattr__(self, key: str) -> Any:
+        """
+        Allows dot-notation attribute access to dictionary keys.
+        """
         try:
             return self[key]
         except KeyError:
             raise AttributeError(f"'ConfigDict' object has no attribute '{key}'")
 
     def __setattr__(self, key: str, value: Any) -> None:
+        """
+        Allows dot-notation attribute assignment to dictionary keys.
+        """
         self[key] = ConfigDict(value) if isinstance(value, dict) else value
 
     def __delattr__(self, key: str) -> None:
+        """
+        Allows deletion of keys via attribute deletion syntax.
+        """
         try:
             del self[key]
         except KeyError:

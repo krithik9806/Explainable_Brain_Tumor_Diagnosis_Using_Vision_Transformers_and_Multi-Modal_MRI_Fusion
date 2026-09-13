@@ -104,6 +104,15 @@ class SwinBackbone(nn.Module):
         pretrained: bool = True,
         drop_rate: float = 0.0,
     ):
+        """
+        Initializes the feature extraction Swin Transformer backbone.
+
+        Args:
+            backbone_name: Architecture string identifier.
+            input_channels: Number of input channels (3 or 4).
+            pretrained: Whether to load ImageNet pretrained weights.
+            drop_rate: Dropout rate for backbone layers.
+        """
         super().__init__()
         self.backbone_name = backbone_name
         self.input_channels = input_channels
@@ -117,7 +126,11 @@ class SwinBackbone(nn.Module):
                 drop_rate=drop_rate,
             )
         except Exception as e:
-            print(f"[Warning] Failed to download pretrained weights for '{backbone_name}' ({e}). Initializing without pretrained weights.", flush=True)
+            print(
+                f"[Warning] Failed to download pretrained weights for '{backbone_name}' ({e}). "
+                "Initializing without pretrained weights.",
+                flush=True,
+            )
             self.backbone = timm.create_model(
                 backbone_name,
                 pretrained=False,
@@ -134,6 +147,15 @@ class SwinBackbone(nn.Module):
         self.num_features = self.backbone.num_features  # 768 for swin_tiny
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward feature extraction pass through the Swin backbone.
+
+        Args:
+            x (torch.Tensor): Input image tensor [B, C, H, W].
+
+        Returns:
+            torch.Tensor: Feature embeddings [B, num_features].
+        """
         if x.ndim != 4:
             raise ValueError(f"Expected 4D input tensor [B, C, H, W], got shape {x.shape}")
         if x.shape[1] != self.input_channels:
@@ -255,6 +277,9 @@ def build_swin_backbone(
     pretrained: bool = True,
     drop_rate: float = 0.0,
 ) -> SwinBackbone:
+    """
+    Factory function to construct a SwinBackbone feature extraction instance.
+    """
     return SwinBackbone(
         backbone_name=backbone_name,
         input_channels=input_channels,

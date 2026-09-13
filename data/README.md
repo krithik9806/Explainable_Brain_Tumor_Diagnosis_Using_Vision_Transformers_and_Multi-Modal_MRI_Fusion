@@ -80,18 +80,26 @@ data/raw/brats/
 ### Dataset Statistics & Properties
 - **Volume Shapes**: Consistent 3D voxel grid of `(240, 240, 155)` across all modalities.
 - **Co-registration**: All 4 modalities for each patient are co-registered to the same anatomical space.
+- **Class Distribution & Imbalance**:
+  - Out of 369 training subjects: **293 HGG** (~79.4%) and **76 LGG** (~20.6%), presenting a natural **~3.9:1 class imbalance ratio**.
+  - **Mitigation Strategy**: The pipeline resolves this imbalance through:
+    1. Stratified patient-level splitting (preserving class ratios without slice leakage across splits).
+    2. Inverse frequency class weighting in CrossEntropyLoss: $\text{Weight}_{\text{LGG}} = 2.45$, $\text{Weight}_{\text{HGG}} = 0.628$.
+    3. Balanced 50/50 mini-batch sampling via PyTorch `WeightedRandomSampler`.
+  - **Final Model Performance**: Using `swin_base_patch4_window7_224` (4-channel early fusion), the model achieves **86.73% test accuracy** and **0.9677 AUC** on the held-out 588-slice test split (112 LGG, 476 HGG) with 94.64% LGG recall and 84.87% HGG recall.
 - **Metadata CSVs & Classification Labels**:
   - `name_mapping.csv`: Maps BraTS subject IDs across challenge years (2017–2020) and TCGA/TCIA subject IDs. **Crucially, the `Grade` column in this file provides the binary classification ground-truth label (`HGG` vs `LGG`)** for each subject ID (`BraTS20_Training_001` .. `369`), as training patient directories are organized flatly rather than in separate subfolders.
   - `survival_info.csv`: Contains clinical survival metadata (`Brats20ID`, `Age`, `Survival_days`, `Extent_of_Resection`).
 
 ### Data Quality & Anomaly Notes
-- **`BraTS20_Training_355`**: Segmentation mask is named `W39_1998.09.19_Segm.nii` instead of `BraTS20_Training_355_seg.nii`. Ingestion scripts must support this alias when loading segmentation volumes.
+- **`BraTS20_Training_355`**: Segmentation mask is named `W39_1998.09.19_Segm.nii` instead of `BraTS20_Training_355_seg.nii`. Ingestion scripts support this alias when loading segmentation volumes.
 
 ---
 
-## 3. Preprocessing & Skull-Stripping Note
+## 3. Preprocessing, Leakage Prevention & Skull-Stripping
 
-> [!NOTE]
-> BraTS data is distributed pre-skull-stripped, so this step was skipped for the current pipeline; the function (`src/preprocessing/skull_strip.py`) exists for reusability if raw/new MRI data is added later.
+- **Patient-Level Separation**: To eliminate data leakage, dataset splitting (`src/preprocessing/split_data.py`) partitions data strictly at the **patient volume level** rather than the slice level. Zero slices from any validation or test patient appear in the training split.
+- **Skull-Stripping**: BraTS data is distributed pre-skull-stripped, so this step was bypassed for BraTS; the utility script ([`src/preprocessing/skull_strip.py`](file:///c:/PROJECTS/Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_Fusion/src/preprocessing/skull_strip.py)) is retained for raw or prospective external MRI scans.
+- **Normalization**: Per-slice min-max intensity scaling to `[0.0, 1.0]` and bilinear interpolation to `[224, 224]` spatial resolution.
 
 

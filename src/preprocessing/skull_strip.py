@@ -86,7 +86,7 @@ def skull_strip_nifti(
 def _run_hd_bet(input_p: Path, output_p: Path, device: str = "0", save_mask: bool = False) -> bool:
     """Helper to invoke HD-BET command-line interface or python package."""
     hd_bet_cmd = shutil.which("hd-bet")
-    
+
     if hd_bet_cmd is not None:
         cmd = [hd_bet_cmd, "-i", str(input_p), "-o", str(output_p), "-device", device]
         if not save_mask:
@@ -141,6 +141,9 @@ def _run_fsl_bet(input_p: Path, output_p: Path, save_mask: bool = False) -> bool
 
 
 def main():
+    """
+    Main CLI entrypoint for skull-stripping raw 3D MRI volumes.
+    """
     parser = argparse.ArgumentParser(
         description="Skull stripping utility for 3D raw NIfTI MRI volumes using HD-BET / FSL BET.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

@@ -55,6 +55,13 @@ class SwinAttentionRollout:
     """
 
     def __init__(self, model: SwinClassifier, device: torch.device = torch.device("cpu")):
+        """
+        Initializes the Attention Rollout calculator for a Swin Transformer model.
+
+        Args:
+            model (SwinClassifier): Trained Swin Transformer classifier instance.
+            device (torch.device): Device on which tensors and models are evaluated.
+        """
         self.model = model.to(device)
         self.device = device
         self.attn_maps = []
@@ -76,9 +83,15 @@ class SwinAttentionRollout:
                         self.hooks.append(hook)
 
     def _hook_fn(self, module: nn.Module, input: Tuple[torch.Tensor], output: torch.Tensor):
+        """
+        Hook function that captures the softmax attention weights during forward pass.
+        """
         self.attn_maps.append(output.detach())
 
     def _remove_hooks(self):
+        """
+        Removes all registered PyTorch forward hooks.
+        """
         for hook in self.hooks:
             hook.remove()
         self.hooks = []
@@ -189,9 +202,10 @@ def run_explainability_comparison(
     df_k = pd.read_csv(PROJECT_ROOT / "data/processed/kaggle_splits.csv")
     df_k_test = df_k[df_k["split"].str.lower() == "test"].reset_index(drop=True)
 
-    # Sample 1 representative image per class for Kaggle
+    # Sample 2 representative test images for Kaggle (1 glioma, 1 pituitary)
+    selected_k_classes = ["glioma", "pituitary"]
     k_samples = []
-    for cls in k_class_names:
+    for cls in selected_k_classes:
         sub = df_k_test[df_k_test["class_name"] == cls]
         if len(sub) > 0:
             k_samples.append(sub.iloc[0].to_dict())
@@ -243,17 +257,25 @@ def run_explainability_comparison(
         axes[1].axis("off")
 
         axes[2].imshow(r_blended)
-        axes[2].set_title(f"Attention Rollout Heatmap\n(Multi-Layer Rollout)", fontsize=11, fontweight="bold")
+        axes[2].set_title("Attention Rollout Heatmap\n(Multi-Layer Rollout)", fontsize=11, fontweight="bold")
         axes[2].axis("off")
 
-        plt.suptitle(f"Kaggle Model Explainability Comparison | Sample #{idx} [{true_cls}]", fontsize=13, fontweight="bold", y=0.98)
+        plt.suptitle(
+            f"Kaggle Model Explainability Comparison | Sample #{idx} [{true_cls}]",
+            fontsize=13,
+            fontweight="bold",
+            y=0.98,
+        )
         plt.tight_layout()
 
         out_fn = out_dir / f"comparison_kaggle_{idx:02d}_{true_cls}.png"
         plt.savefig(out_fn, dpi=300, bbox_inches="tight")
         plt.close()
 
-        print(f"  [Kaggle {idx}/4] {true_cls:<11} | Pred: {pred_cls:<11} ({conf * 100:.1f}%) -> Saved: {out_fn.name}", flush=True)
+        print(
+            f"  [Kaggle {idx}/2] {true_cls:<11} | Pred: {pred_cls:<11} ({conf * 100:.1f}%) -> Saved: {out_fn.name}",
+            flush=True,
+        )
 
         comparison_summary.append({
             "dataset": "Kaggle",
@@ -275,16 +297,23 @@ def run_explainability_comparison(
     df_b = pd.read_csv(PROJECT_ROOT / "data/processed/brats_splits.csv")
     df_b_test = df_b[df_b["split"].str.lower() == "test"].reset_index(drop=True)
 
+    # Select 2 LGG and 2 HGG representative test examples with prominent tumor masks
+    target_specs = [
+        ("LGG", "BraTS20_Training_310"),
+        ("LGG", "BraTS20_Training_313"),
+        ("HGG", "BraTS20_Training_020"),
+        ("HGG", "BraTS20_Training_186"),
+    ]
     b_samples = []
-    for grade in b_class_names:
-        sub = df_b_test[df_b_test["grade"] == grade]
+    for grade, patient_id in target_specs:
+        sub = df_b_test[(df_b_test["grade"] == grade) & (df_b_test["patient_id"] == patient_id)]
         for _, r in sub.iterrows():
             fp = (PROJECT_ROOT / "data" / r["file_path"]).resolve()
             if not fp.exists():
                 fp = (PROJECT_ROOT / r["file_path"]).resolve()
             if fp.exists():
                 data = np.load(fp)
-                if np.sum(data["mask"]) > 50:
+                if np.sum(data["mask"]) > 100:
                     b_samples.append(r.to_dict())
                     break
 
@@ -330,7 +359,11 @@ def run_explainability_comparison(
         axes[0].imshow(flair_norm, cmap="gray")
         if np.sum(mask) > 0:
             axes[0].contour(mask, levels=[0.5], colors=["magenta"], linewidths=1.8)
-        axes[0].set_title(f"FLAIR MRI (Display Background)\nTrue Grade: {true_grade} (Mask in Magenta)", fontsize=10, fontweight="bold")
+        axes[0].set_title(
+            f"FLAIR MRI (Display Background)\nTrue Grade: {true_grade} (Mask in Magenta)",
+            fontsize=10,
+            fontweight="bold",
+        )
         axes[0].axis("off")
 
         color_str = "green" if is_corr else "red"
@@ -348,17 +381,25 @@ def run_explainability_comparison(
         axes[2].imshow(r_blended)
         if np.sum(mask) > 0:
             axes[2].contour(mask, levels=[0.5], colors=["magenta"], linewidths=1.8)
-        axes[2].set_title(f"Attention Rollout Heatmap\n(Multi-Layer Rollout)", fontsize=10, fontweight="bold")
+        axes[2].set_title("Attention Rollout Heatmap\n(Multi-Layer Rollout)", fontsize=10, fontweight="bold")
         axes[2].axis("off")
 
-        plt.suptitle(f"BraTS Model Explainability Comparison | {patient_id} [{true_grade}]", fontsize=12, fontweight="bold", y=0.98)
+        plt.suptitle(
+            f"BraTS Model Explainability Comparison | {patient_id} [{true_grade}]",
+            fontsize=12,
+            fontweight="bold",
+            y=0.98,
+        )
         plt.tight_layout()
 
         out_fn = out_dir / f"comparison_brats_{idx:02d}_{true_grade}_{patient_id}.png"
         plt.savefig(out_fn, dpi=300, bbox_inches="tight")
         plt.close()
 
-        print(f"  [BraTS {idx}/2] {true_grade:<4} | Pred: {pred_grade:<4} ({conf * 100:.1f}%) -> Saved: {out_fn.name}", flush=True)
+        print(
+            f"  [BraTS {idx}/4] {true_grade:<4} | Pred: {pred_grade:<4} ({conf * 100:.1f}%) -> Saved: {out_fn.name}",
+            flush=True,
+        )
 
         comparison_summary.append({
             "dataset": "BraTS",
@@ -378,7 +419,12 @@ def run_explainability_comparison(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Side-by-Side Explainability Comparison (Grad-CAM vs Attention Rollout)")
+    """
+    Main CLI entrypoint for running side-by-side explainability comparison.
+    """
+    parser = argparse.ArgumentParser(
+        description="Run Side-by-Side Explainability Comparison (Grad-CAM vs Attention Rollout)"
+    )
     parser.add_argument(
         "--kaggle_checkpoint",
         type=str,
@@ -422,3 +468,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

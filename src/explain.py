@@ -506,6 +506,9 @@ def run_gradcam_on_brats_testset(
 
 
 def main():
+    """
+    Main CLI entrypoint for running Grad-CAM explainability over Kaggle and/or BraTS models.
+    """
     parser = argparse.ArgumentParser(description="Run Grad-CAM Visual Explainability for Swin Transformer Models")
     parser.add_argument(
         "--dataset",

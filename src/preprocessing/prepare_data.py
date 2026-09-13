@@ -235,6 +235,9 @@ def prepare_kaggle_data(
 
 
 def main():
+    """
+    Main CLI entrypoint orchestrating data preparation for BraTS and Kaggle datasets.
+    """
     parser = argparse.ArgumentParser(
         description="Full Data Preparation Pipeline for BraTS and Kaggle Datasets.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

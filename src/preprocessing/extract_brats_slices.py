@@ -30,6 +30,9 @@ def normalize_intensity(slice_img):
     return np.zeros_like(slice_img, dtype=np.float32)
 
 def main():
+    """
+    Main pipeline script for extracting 2D axial multi-modal slices from 3D BraTS NIfTI volumes.
+    """
     print("=== BraTS 2D Slice Extraction Script ===")
     print(f"Random Seed: {SEED}")
     print(f"Target Patient Subsample Count: {TARGET_PATIENT_COUNT}")
@@ -149,7 +152,10 @@ def main():
 
         if (idx + 1) % 20 == 0 or (idx + 1) == len(selected_df):
             elapsed = time.time() - start_time
-            print(f"Processed {idx + 1}/{len(selected_df)} patients | Slices saved: {total_slices_saved} | Elapsed: {elapsed:.1f}s")
+            print(
+                f"Processed {idx + 1}/{len(selected_df)} patients | Slices saved: {total_slices_saved} | "
+                f"Elapsed: {elapsed:.1f}s"
+            )
 
     # Save manifest CSV
     manifest_df = pd.DataFrame(manifest_records)

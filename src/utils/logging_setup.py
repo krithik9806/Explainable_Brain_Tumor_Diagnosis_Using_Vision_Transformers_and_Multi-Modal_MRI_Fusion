@@ -32,7 +32,8 @@ def setup_wandb_logging(project_name: str, config: Dict[str, Any], run_name: Opt
             name=run_name,
             reinit=True,
         )
-        print(f"[Logging Setup] W&B run initialized successfully: project='{project_name}', run_name='{run.name if run else run_name}'")
+        r_name = run.name if run else run_name
+        print(f"[Logging Setup] W&B run initialized successfully: project='{project_name}', run_name='{r_name}'")
         return run
     except Exception as e:
         print(f"[Logging Setup] Warning: W&B initialization skipped/failed ({e}). Continuing with console logging.")

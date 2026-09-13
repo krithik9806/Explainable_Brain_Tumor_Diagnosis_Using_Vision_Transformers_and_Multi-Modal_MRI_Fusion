@@ -50,9 +50,9 @@ import torch.nn as nn
 class BraTSEarlyFusion(nn.Module):
     """
     Early Fusion module for BraTS 4-modality MRI scans.
-    
+
     Stacks 4 co-registered 2D MRI modalities (T1, T1ce, T2, FLAIR) into a 4-channel tensor of shape [4, H, W].
-    
+
     Expected Channel Ordering:
         Channel 0: T1
         Channel 1: T1ce
@@ -196,7 +196,7 @@ class BraTSEarlyFusion(nn.Module):
 class KagglePassThrough(nn.Module):
     """
     Pass-through fusion module for Kaggle single-modality MRI images.
-    
+
     Provides a uniform interface by accepting single-modality image data and formatting it
     into a 3-channel tensor of shape [3, H, W].
     """

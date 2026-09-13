@@ -235,12 +235,22 @@ def run_training(
     ds_name = cfg.dataset.name.lower()
     if "brats" in ds_name:
         csv_path = PROJECT_ROOT / "data" / "processed" / "brats_splits.csv"
-        train_dataset = BraTSDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names, transform=transform_override)
+        train_dataset = BraTSDataset(
+            csv_path=csv_path,
+            split="train",
+            class_names=cfg.dataset.class_names,
+            transform=transform_override,
+        )
         val_dataset = BraTSDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
         exp_prefix = f"brats_{'base' if 'base' in backbone else 'tiny'}"
     elif "kaggle" in ds_name:
         csv_path = PROJECT_ROOT / "data" / "processed" / "kaggle_splits.csv"
-        train_dataset = KaggleDataset(csv_path=csv_path, split="train", class_names=cfg.dataset.class_names, transform=transform_override)
+        train_dataset = KaggleDataset(
+            csv_path=csv_path,
+            split="train",
+            class_names=cfg.dataset.class_names,
+            transform=transform_override,
+        )
         val_dataset = KaggleDataset(csv_path=csv_path, split="val", class_names=cfg.dataset.class_names)
         exp_prefix = f"kaggle_{'base' if 'base' in backbone else 'tiny'}"
     else:
@@ -320,7 +330,8 @@ def run_training(
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     # 5. Setup W&B logging
-    run_name = run_name_override if run_name_override is not None else (f"{cfg.experiment_name}_{backbone}_debug" if debug else f"{cfg.experiment_name}_{backbone}")
+    default_run_suffix = f"{cfg.experiment_name}_{backbone}_debug" if debug else f"{cfg.experiment_name}_{backbone}"
+    run_name = run_name_override if run_name_override is not None else default_run_suffix
     wandb_run = setup_wandb_logging(
         project_name=cfg.logging.wandb_project_name,
         config=cfg,
@@ -481,12 +492,20 @@ def run_training(
 
 
 def main():
+    """
+    Main CLI entrypoint for training Swin Transformer classifiers.
+    """
     parser = argparse.ArgumentParser(description="Train Swin Transformer on Brain MRI Dataset")
     parser.add_argument("--config", type=str, default="configs/kaggle_config.yaml", help="Path to config file")
     parser.add_argument("--epochs", type=int, default=None, help="Override number of epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Override batch size")
     parser.add_argument("--learning_rate", "-lr", type=float, default=None, help="Override learning rate")
-    parser.add_argument("--backbone", type=str, default=None, help="Override Swin backbone (e.g. swin_tiny_patch4_window7_224 or swin_base_patch4_window7_224)")
+    parser.add_argument(
+        "--backbone",
+        type=str,
+        default=None,
+        help="Override Swin backbone (e.g. swin_tiny_patch4_window7_224 or swin_base_patch4_window7_224)",
+    )
     parser.add_argument("--max_samples", type=int, default=None, help="Max dataset samples for debug/fast run")
     parser.add_argument("--no_class_weights", action="store_true", help="Disable automatic class-weighted loss")
     parser.add_argument("--no_weighted_sampler", action="store_true", help="Disable weighted random sampler")

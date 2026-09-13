@@ -178,6 +178,10 @@ def preprocess_kaggle_image(file_bytes: bytes) -> Tuple[np.ndarray, np.ndarray, 
     return img_rgb, display_bg, image_tensor
 
 
+# Backward compatibility alias for single-modality preprocessing
+preprocess_uploaded_image = preprocess_kaggle_image
+
+
 def decode_brats_modality_bytes(file_bytes: bytes, filename: str) -> np.ndarray:
     """
     Decodes raw file bytes for a BraTS modality slice (supporting PNG, JPG, and NPZ/NPY formats).

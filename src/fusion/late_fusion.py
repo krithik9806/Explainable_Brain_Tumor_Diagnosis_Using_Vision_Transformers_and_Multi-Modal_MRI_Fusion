@@ -32,6 +32,13 @@ class SingleModalityEncoder(nn.Module):
     """
 
     def __init__(self, in_channels: int = 1, embed_dim: int = 128):
+        """
+        Initializes the single-modality CNN encoder.
+
+        Args:
+            in_channels (int): Input image channels (default 1 for grayscale MRI).
+            embed_dim (int): Dimensionality of output feature embedding.
+        """
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
@@ -47,6 +54,15 @@ class SingleModalityEncoder(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Encodes a single MRI modality slice into an embedding vector.
+
+        Args:
+            x (torch.Tensor): Input tensor [B, 1, H, W] or [B, H, W].
+
+        Returns:
+            torch.Tensor: Feature embedding [B, embed_dim].
+        """
         # Expect input shape [B, 1, H, W] or [B, H, W]
         if x.ndim == 3:
             x = x.unsqueeze(1)

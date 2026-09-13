@@ -47,10 +47,10 @@ def split_brats_dataset(
         raise FileNotFoundError(f"BraTS manifest file not found at {manifest_path}")
 
     df_manifest = pd.read_csv(manifest_path)
-    
+
     # Extract unique patient IDs and their tumor grade (HGG / LGG)
     patient_df = df_manifest[['patient_id', 'grade']].drop_duplicates().reset_index(drop=True)
-    
+
     # First split: Train (70%) vs Temp (30%)
     temp_ratio = val_ratio + test_ratio  # 0.30
     train_patients, temp_patients = train_test_split(
@@ -79,7 +79,7 @@ def split_brats_dataset(
 
     # Assign split to every slice in manifest
     df_manifest['split'] = df_manifest['patient_id'].map(patient_split_map)
-    
+
     # Update file paths to point to normalized directory
     df_manifest['file_path'] = df_manifest['file_path'].apply(
         lambda p: str(Path(p).as_posix()).replace("data/processed/brats_slices", "data/processed/brats_normalized")
@@ -98,9 +98,11 @@ def split_brats_dataset(
     overlap_train_test = train_set.intersection(test_set)
     overlap_val_test = val_set.intersection(test_set)
 
-    has_no_leakage = (len(overlap_train_val) == 0 and 
-                      len(overlap_train_test) == 0 and 
-                      len(overlap_val_test) == 0)
+    has_no_leakage = (
+        len(overlap_train_val) == 0 and
+        len(overlap_train_test) == 0 and
+        len(overlap_val_test) == 0
+    )
 
     summary = {
         "unique_patients": len(patient_df),
@@ -143,7 +145,7 @@ def split_kaggle_dataset(
         orig_folder = rel_parts[0]  # 'Training' or 'Testing'
         class_name = rel_parts[1]   # 'glioma', 'meningioma', 'notumor', 'pituitary'
         filename = f.name
-        
+
         records.append({
             "filename": filename,
             "class_name": class_name,
@@ -186,6 +188,9 @@ def split_kaggle_dataset(
 
 
 def main():
+    """
+    Main CLI entrypoint for patient-stratified data splitting.
+    """
     parser = argparse.ArgumentParser(
         description="Dataset splitting script for BraTS and Kaggle brain MRI data.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

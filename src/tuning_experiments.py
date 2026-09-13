@@ -30,7 +30,16 @@ weaker_aug_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3, border_mode=cv2.BORDER_CONSTANT),
 ])
 
-def custom_transform_callable(fused_tensor):
+def custom_transform_callable(fused_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Applies custom Albumentations data augmentation to a 4-channel MRI tensor.
+
+    Args:
+        fused_tensor (torch.Tensor): Input tensor [4, H, W].
+
+    Returns:
+        torch.Tensor: Augmented tensor [4, H, W].
+    """
     # PyTorch [4, H, W] tensor -> numpy [H, W, 4] -> albumentations -> PyTorch tensor
     np_img = fused_tensor.numpy().transpose(1, 2, 0)
     aug = weaker_aug_pipeline(image=np_img)["image"]
@@ -86,6 +95,16 @@ VARIATIONS = [
 
 
 def run_all_variations(epochs: int = 3, max_samples: int = 240):
+    """
+    Executes systematic hyperparameter variation sweeps for BraTS multi-modal fusion.
+
+    Args:
+        epochs (int): Number of training epochs per variation.
+        max_samples (int): Max samples per split for fast comparison.
+
+    Returns:
+        List[Dict[str, Any]]: List of recorded performance metrics per variation.
+    """
     results = []
 
     print("=" * 85)

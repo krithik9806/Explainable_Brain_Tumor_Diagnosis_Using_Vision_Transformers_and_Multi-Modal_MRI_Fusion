@@ -335,6 +335,9 @@ def run_evaluation(
 
 
 def main():
+    """
+    Main CLI entrypoint for evaluating a trained Swin Transformer model on test split.
+    """
     parser = argparse.ArgumentParser(description="Evaluate Swin Transformer Brain Tumor Classifier on Test Set.")
     parser.add_argument(
         "--checkpoint",
