@@ -100,25 +100,75 @@ This project supports multi-modal benchmark datasets and single-modality clinica
 
 Below are the final, verified test set evaluation results across all primary model configurations:
 
-| Model Architecture | Dataset & Experiment | Epochs | Best Val Accuracy | Test Accuracy | Test F1-Score (Target / Macro) | Test AUC | Class Imbalance Handling | Status |
-|---|---|---:|---:|---:|---:|---:|---|---|
-| **Swin-Tiny** | Kaggle (4-Class Single-Modality) | — | — | **87.75%** | **0.8751** (Macro) | **0.9759** (OvR) | Balanced Split | Baseline (Verified) |
-| **Swin-Base** | BraTS (2-Class Multi-Modal Fusion) | 20 | **90.65%** | **86.73%** | **0.9120** (HGG) / **0.8169** (Macro) | **0.9677** | Class Weights + Sampler | **Final Model** (Fixed) |
+| Model Architecture | Dataset & Experiment | Input Modalities | Parameters | Epochs | Best Val Accuracy | Test Accuracy | Macro F1-Score | Test ROC-AUC | Imbalance Handling | Status |
+|---|---|---|---:|---:|---:|---:|---:|---:|---|---|
+| **Swin-Tiny** (`swin_tiny_patch4_window7_224`) | Kaggle Brain Tumor (4-Class Classification) | Single 2D Axial (3-ch expanded) | 27.52M | — | — | **87.75%** | **0.8751** | **0.9759** (OvR) | Balanced Split | **Verified Final** |
+| **Swin-Base** (`swin_base_patch4_window7_224`) | BraTS 2020 (HGG vs LGG Binary Fusion) | 4-Ch Early Fusion (T1, T1ce, T2, FLAIR) | 86.75M | 20 | **90.65%** | **86.73%** | **0.8215** | **0.9677** | Loss Weights + Sampler | **Verified Final** |
 
-### Superseded / Historical Baseline Runs (Pre-Fix):
+---
+
+### Detailed Per-Class Breakdown & Confusion Matrices
+
+#### 1. BraTS 2020 Multi-Modal Early Fusion (Swin-Base)
+Evaluated on **588 held-out patient-level test slices** (112 LGG, 476 HGG):
+
+| Class (Tumor Grade) | Precision | Recall | F1-Score | Test Support |
+|---|---:|---:|---:|---:|
+| **LGG (Low-Grade Glioma)** | 0.5955 | **0.9464** | 0.7310 | 112 |
+| **HGG (High-Grade Glioma)** | 0.9854 | 0.8487 | **0.9120** | 476 |
+| **Macro Average** | 0.7904 | 0.8976 | **0.8215** | 588 |
+| **Weighted Average** | 0.9111 | 0.8673 | **0.8775** | 588 |
+
+* **Binary Metrics (HGG as positive class):** Precision = `0.9854` | Recall = `0.8487` | F1-Score = `0.9120` | ROC-AUC = `0.9677`.
+* **Confusion Matrix** `[Row: True, Col: Pred]`:
+  ```text
+                Pred LGG    Pred HGG
+  True LGG           106           6
+  True HGG            72         404
+  ```
+* **Key Finding:** LGG minority recall reached **94.64%** (106 / 112), demonstrating decisive recovery from initial class-imbalance collapse.
+
+#### 2. Kaggle 4-Class Single-Modality Classification (Swin-Tiny)
+Evaluated on **1,600 held-out test images** (400 balanced samples per class):
+
+| Class | Precision | Recall | F1-Score | Test Support |
+|---|---:|---:|---:|---:|
+| **glioma** | **0.9856** | 0.6850 | 0.8083 | 400 |
+| **meningioma** | 0.7623 | 0.8900 | 0.8212 | 400 |
+| **notumor** | 0.8728 | **0.9950** | 0.9299 | 400 |
+| **pituitary** | 0.9424 | 0.9400 | **0.9412** | 400 |
+| **Macro Average** | **0.8908** | **0.8775** | **0.8751** | 1600 |
+| **Weighted Average** | **0.8908** | **0.8775** | **0.8751** | 1600 |
+
+* **ROC-AUC (One-vs-Rest Macro):** `0.9759`
+* **Confusion Matrix** `[Row: True, Col: Pred]`:
+  ```text
+                  Pred Glioma   Pred Meningioma   Pred NoTumor   Pred Pituitary
+  True Glioma             274                87             35                4
+  True Meningioma           2               356             23               19
+  True NoTumor              0                 2            398                0
+  True Pituitary            2                22              0              376
+  ```
+* **Observed Limitation:** Glioma recall was **68.50%** (274 / 400), with 87 glioma cases misclassified as meningioma, reflecting shared radiological textural characteristics on single-sequence T1 MRI.
+
+---
+
+### Superseded Baseline Runs & Class-Imbalance Resolution (For Transparency)
+
 > [!NOTE]
-> The following earlier baseline runs were conducted prior to fixing class imbalance / stem initialization and are retained for complete reporting transparency:
-> - **Swin-Tiny BraTS Baseline (Superseded)**: Test Accuracy **80.95%**, Test AUC **0.5612**, LGG Recall **0.00%** (Model collapsed to predicting majority HGG class only).
-> - **Initial Swin-Base Un-tuned Pass (Superseded)**: Test Accuracy **56.29%**, Test AUC **0.5210** (Early un-tuned training run prior to weighted random sampling).
-
-### Detailed Test Confusion Matrix & Recall Breakdown (Swin-Base BraTS):
-* **Held-Out Test Set:** 588 total 2D slices (112 LGG, 476 HGG).
-* **Confusion Matrix:** `[[106, 6], [72, 404]]`
-* **LGG Recall (Minority Class):** **94.64%** (106 / 112) — *drastic recovery from 0.00% collapse baseline*.
-* **HGG Recall (Majority Class):** **84.87%** (404 / 476).
+> The following earlier baseline runs were conducted prior to fixing class imbalance and stem hyperparameter tuning. They are retained to provide full methodological transparency:
+>
+> 1. **Swin-Tiny BraTS Unweighted Baseline (Collapsed)**:
+>    - **Test Accuracy:** `80.95%` | **Test ROC-AUC:** `~0.5612` (0.5185) | **LGG Recall:** `0.00%` (0 / 112).
+>    - **Diagnosis:** The natural ~3.9:1 class imbalance in BraTS 2020 caused standard Cross-Entropy loss to collapse to naive majority-class prediction (predicting HGG for 100% of samples, yielding a deceptive 80.95% accuracy matching the baseline class ratio).
+>    - **Resolution:** Introduced inverse frequency class weighting ($\text{Weight}_{\text{LGG}} = 2.45$, $\text{Weight}_{\text{HGG}} = 0.628$) paired with PyTorch `WeightedRandomSampler` for balanced 50/50 mini-batch sampling, followed by upgrading to `swin_base_patch4_window7_224` (86.75M parameters) with a tuned learning rate ($1.5 \times 10^{-5}$), restoring minority LGG recall to **94.64%** and test AUC to **0.9677**.
+>
+> 2. **Initial Swin-Base Un-tuned Pass**:
+>    - **Test Accuracy:** `56.29%` | **Test ROC-AUC:** `0.5210`.
+>    - **Diagnosis:** Undertraining and suboptimal learning rate on the larger 86.7M parameter backbone. Resolved via 20 full epochs with cosine annealing and stem adaptation fine-tuning.
 
 > [!IMPORTANT]
-> Comprehensive epoch-by-epoch CSV data, console logs, loss/accuracy curves, and mentor documentation are archived in [`results/training_documentation/FINAL_RESULTS_SUMMARY.md`](results/training_documentation/FINAL_RESULTS_SUMMARY.md).
+> Comprehensive epoch-by-epoch CSV data, console logs, loss/accuracy curves, and mentor documentation are archived in [`results/training_documentation/FINAL_RESULTS_SUMMARY.md`](results/training_documentation/FINAL_RESULTS_SUMMARY.md). Detailed research writeup and academic paper draft are available in [`REPORT.md`](REPORT.md).
 
 ---
 
@@ -198,6 +248,7 @@ Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_
 ├── checkpoints/                   # Trained model weights (.pth)
 ├── requirements.txt
 ├── LICENSE
+├── REPORT.md                      # Comprehensive academic project report & paper draft
 └── README.md
 ```
 
@@ -217,7 +268,7 @@ Explainable_Brain_Tumor_Diagnosis_Using_Vision_Transformers_and_Multi-Modal_MRI_
 
 - [x] Multi-modal 4-channel MRI early fusion stem adaptation
 - [x] Class imbalance resolution via weighted loss & balanced sampling
-- [x] Swin-Base fine-tuning optimization (89.46% test accuracy, 0.9702 AUC)
+- [x] Swin-Base fine-tuning optimization (86.73% test accuracy, 0.9677 AUC, 90.65% val accuracy)
 - [x] Grad-CAM & Attention Rollout explainability pipeline
 - [x] Full mentor-ready documentation & training history archiving
 - [ ] 3D Volumetric Swin Transformer support (Swin-UNETR)
