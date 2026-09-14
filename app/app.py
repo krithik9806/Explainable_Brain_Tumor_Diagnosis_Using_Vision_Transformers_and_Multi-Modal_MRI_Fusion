@@ -1,16 +1,11 @@
 """
 Streamlit Web Application for Explainable Brain Tumor Diagnosis.
 
-Supports two primary diagnostic modes with preloaded clinical demo cases:
-1. Single-Modality (Kaggle):
-   - Preloaded clinical cases (Glioma, Meningioma, Pituitary, No Tumor) or custom upload
-   - 4-class classification via Swin-Tiny (87.75% Test Acc, 0.9759 AUC)
-   - Real-time Grad-CAM explainability overlay
-2. Multi-Modal Fusion (BraTS):
-   - Preloaded patient cases (LGG vs. HGG) or custom 4-channel upload
-   - 4-channel early fusion of co-registered MRI sequences (T1, T1ce, T2, FLAIR)
-   - Binary grading via Swin-Base (86.73% Test Acc, 0.9677 AUC, 94.64% LGG recall)
-   - Dual Grad-CAM & Swin Attention Rollout visual explainability
+Redesigned Product-Grade Interface:
+- Theme System: Light theme default with seamless Dark theme toggle.
+- Clean SaaS Flow: Hero -> Visual Mode Selection -> Primary Upload Dropzone -> Analysis -> Explainability.
+- Preloaded clinical samples demoted to secondary 1-click test expanders.
+- Model benchmark stat cards moved to collapsible technical details section.
 """
 
 import io
@@ -43,47 +38,47 @@ from src.utils.config_loader import load_config
 
 
 # ==============================================================================
-# PRELOADED CLINICAL DEMO SAMPLE PATHS
+# PRELOADED CLINICAL DEMO CASES (SECONDARY QUICK-TEST DATA)
 # ==============================================================================
 
 KAGGLE_DEMO_SAMPLES = {
-    "Glioma (Intra-Axial Infiltrative Lesion)": {
+    "Glioma (Intra-Axial Lesion)": {
         "path": PROJECT_ROOT / "data" / "raw" / "kaggle" / "Testing" / "glioma" / "Te-gl_1.jpg",
-        "true_label": "Glioma",
-        "description": "Axial T1-weighted slice displaying an intra-axial heterogeneous parenchymal lesion with mass effect.",
+        "label": "Glioma",
+        "description": "High-grade intra-axial parenchymal mass with mass effect.",
     },
-    "Pituitary Adenoma (Sellar / Parasellar Mass)": {
+    "Pituitary Adenoma (Sellar Mass)": {
         "path": PROJECT_ROOT / "data" / "raw" / "kaggle" / "Testing" / "pituitary" / "Te-pi_1.jpg",
-        "true_label": "Pituitary",
-        "description": "Axial slice localized to the sella turcica showing a circumscribed adenoma extending superiorly.",
+        "label": "Pituitary",
+        "description": "Circumscribed sellar / parasellar adenoma.",
     },
-    "Healthy Brain (Healthy Normal Control)": {
+    "Healthy Normal Control": {
         "path": PROJECT_ROOT / "data" / "raw" / "kaggle" / "Testing" / "notumor" / "Te-no_1.jpg",
-        "true_label": "No Tumor",
-        "description": "Normal cerebral anatomical baseline without intracranial mass effect, shift, or signal anomaly.",
+        "label": "No Tumor",
+        "description": "Normal cerebral anatomical baseline without lesion or edema.",
     },
-    "Meningioma (Extra-Axial Dural-Based Mass)": {
+    "Meningioma (Dural-Based Mass)": {
         "path": PROJECT_ROOT / "data" / "raw" / "kaggle" / "Testing" / "meningioma" / "Te-aug-me_1.jpg",
-        "true_label": "Meningioma",
-        "description": "Extra-axial, dural-based extra-parenchymal mass exerting compressive pressure on adjacent sulci.",
+        "label": "Meningioma",
+        "description": "Extra-axial, dural-based mass compressing adjacent cortical tissue.",
     },
 }
 
 BRATS_DEMO_SAMPLES = {
-    "Patient 310 — Low-Grade Glioma (LGG, Slice 52)": {
+    "Patient 310 (Low-Grade Glioma / LGG, Slice 52)": {
         "path": PROJECT_ROOT / "data" / "processed" / "brats_normalized" / "BraTS20_Training_310" / "slice_052.npz",
-        "true_grade": "LGG",
-        "description": "WHO Grade II astrocytoma displaying hyperintense T2/FLAIR signal without aggressive necrotic cavitation or hypervascular enhancement.",
+        "grade": "LGG",
+        "description": "WHO Grade II astrocytoma with hyperintense T2/FLAIR signal without aggressive necrosis.",
     },
-    "Patient 020 — High-Grade Glioma (HGG, Slice 40)": {
+    "Patient 020 (High-Grade Glioma / HGG, Slice 40)": {
         "path": PROJECT_ROOT / "data" / "processed" / "brats_normalized" / "BraTS20_Training_020" / "slice_040.npz",
-        "true_grade": "HGG",
-        "description": "WHO Grade IV Glioblastoma exhibiting prominent peripheral contrast enhancement on T1ce and severe vasogenic edema on FLAIR.",
+        "grade": "HGG",
+        "description": "WHO Grade IV glioblastoma displaying intense ring enhancement on T1ce and vasogenic edema.",
     },
-    "Patient 006 — High-Grade Glioblastoma (HGG, Slice 84)": {
+    "Patient 006 (High-Grade Glioblastoma / HGG, Slice 84)": {
         "path": PROJECT_ROOT / "data" / "processed" / "brats_normalized" / "BraTS20_Training_006" / "slice_084.npz",
-        "true_grade": "HGG",
-        "description": "Large necrotic cavitary glioblastoma with distinct infiltrative non-enhancing margins and substantial ventricular shift.",
+        "grade": "HGG",
+        "description": "Large necrotic cavitary glioblastoma with marked ventricular compression.",
     },
 }
 
@@ -92,7 +87,7 @@ BRATS_DEMO_SAMPLES = {
 # CACHED MODEL LOADERS (WITH BACKBONE AUTO-DETECTION)
 # ==============================================================================
 
-@st.cache_resource(show_spinner="Loading Kaggle Swin-Tiny model weights...")
+@st.cache_resource(show_spinner=False)
 def load_kaggle_model(
     checkpoint_path: str = "checkpoints/kaggle_best_model.pth",
     config_path: str = "configs/kaggle_config.yaml",
@@ -133,7 +128,7 @@ def load_kaggle_model(
     return model, meta
 
 
-@st.cache_resource(show_spinner="Loading BraTS Multi-Modal Swin-Base model weights...")
+@st.cache_resource(show_spinner=False)
 def load_brats_model(
     checkpoint_path: str = "checkpoints/brats_best_model.pth",
     config_path: str = "configs/brats_fusion_config.yaml",
@@ -225,199 +220,345 @@ def preprocess_brats_slice(arr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 
 # ==============================================================================
-# MAIN STREAMLIT APP
+# DYNAMIC CSS THEME INJECTION
+# ==============================================================================
+
+def inject_theme_css(is_dark: bool = False):
+    """
+    Injects polished, clinical-grade CSS with light default and full dark support.
+    """
+    if is_dark:
+        bg_main = "#0b1329"
+        bg_card = "#131f37"
+        bg_card_hover = "#1a2a4a"
+        border_color = "#1e293b"
+        text_primary = "#f8fafc"
+        text_secondary = "#94a3b8"
+        accent = "#38bdf8"
+        accent_bg = "rgba(56, 189, 248, 0.12)"
+        accent_border = "#0284c7"
+        card_shadow = "0 8px 24px -4px rgba(0, 0, 0, 0.45)"
+        dropzone_bg = "#0f172a"
+    else:
+        bg_main = "#f8fafc"
+        bg_card = "#ffffff"
+        bg_card_hover = "#f1f5f9"
+        border_color = "#e2e8f0"
+        text_primary = "#0f172a"
+        text_secondary = "#475569"
+        accent = "#0284c7"
+        accent_bg = "rgba(2, 132, 199, 0.08)"
+        accent_border = "#38bdf8"
+        card_shadow = "0 8px 20px -2px rgba(15, 23, 42, 0.06)"
+        dropzone_bg = "#ffffff"
+
+    css = f"""
+    <style>
+    /* Global App Background & Font Settings */
+    .stApp {{
+        background-color: {bg_main};
+        color: {text_primary};
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }}
+
+    /* Main Container Padding */
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1200px;
+    }}
+
+    /* Hero Section */
+    .hero-container {{
+        text-align: center;
+        padding: 1.5rem 1rem 1rem 1rem;
+        margin-bottom: 1.5rem;
+    }}
+    .hero-badge {{
+        display: inline-block;
+        padding: 4px 14px;
+        background: {accent_bg};
+        border: 1px solid {accent};
+        border-radius: 9999px;
+        color: {accent};
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 0.8rem;
+    }}
+    .hero-title {{
+        font-size: 2.3rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: {text_primary};
+        margin: 0 0 0.5rem 0;
+    }}
+    .hero-sub {{
+        font-size: 1.05rem;
+        color: {text_secondary};
+        max-width: 760px;
+        margin: 0 auto;
+        line-height: 1.5;
+    }}
+
+    /* Mode Selection Cards */
+    .mode-card {{
+        background: {bg_card};
+        border: 2px solid {border_color};
+        border-radius: 14px;
+        padding: 20px;
+        text-align: left;
+        box-shadow: {card_shadow};
+        transition: all 0.2s ease-in-out;
+        min-height: 170px;
+    }}
+    .mode-card-active {{
+        border-color: {accent} !important;
+        background: {accent_bg} !important;
+    }}
+    .mode-icon {{
+        font-size: 1.8rem;
+        margin-bottom: 8px;
+    }}
+    .mode-title {{
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: {text_primary};
+        margin-bottom: 4px;
+    }}
+    .mode-desc {{
+        font-size: 0.88rem;
+        color: {text_secondary};
+        line-height: 1.4;
+    }}
+    .mode-badge {{
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: {accent};
+        color: white;
+        margin-top: 10px;
+    }}
+
+    /* Dropzone and Container Cards */
+    .upload-card {{
+        background: {bg_card};
+        border: 1px solid {border_color};
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: {card_shadow};
+        margin-bottom: 1.5rem;
+    }}
+    .upload-card-header {{
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: {text_primary};
+        margin-bottom: 4px;
+    }}
+    .upload-card-sub {{
+        font-size: 0.88rem;
+        color: {text_secondary};
+        margin-bottom: 16px;
+    }}
+
+    /* Result Card Styling */
+    .result-card {{
+        background: {bg_card};
+        border: 1px solid {border_color};
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: {card_shadow};
+        margin-top: 1.5rem;
+    }}
+    .result-grade {{
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: {accent};
+    }}
+    .confidence-meter {{
+        background: {border_color};
+        border-radius: 9999px;
+        height: 10px;
+        overflow: hidden;
+        margin-top: 8px;
+    }}
+    .confidence-fill {{
+        background: {accent};
+        height: 100%;
+        border-radius: 9999px;
+    }}
+
+    /* Dropzone grid item */
+    .dropzone-box {{
+        background: {dropzone_bg};
+        border: 1px dashed {border_color};
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+    }}
+
+    /* Button Polish */
+    div.stButton > button {{
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 0.55rem 1.4rem;
+        transition: all 0.15s ease-in-out;
+    }}
+    div.stButton > button[kind="primary"] {{
+        background-color: {accent};
+        border: none;
+        color: #ffffff;
+    }}
+    div.stButton > button[kind="primary"]:hover {{
+        background-color: {accent_border};
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    }}
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {{
+        background-color: {bg_card};
+        border-right: 1px solid {border_color};
+    }}
+
+    /* Discreet Footer */
+    .footer-text {{
+        text-align: center;
+        color: {text_secondary};
+        font-size: 0.78rem;
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid {border_color};
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+
+# ==============================================================================
+# MAIN APPLICATION
 # ==============================================================================
 
 def main():
     st.set_page_config(
-        page_title="Explainable Brain Tumor Diagnosis",
+        page_title="NeuroVision | Explainable Brain Tumor Diagnosis",
         page_icon="🧠",
         layout="wide",
         initial_sidebar_state="expanded",
     )
 
-    # Custom Clean Clinical CSS
+    # Initialize Session State
+    if "selected_mode" not in st.session_state:
+        st.session_state["selected_mode"] = "single"  # 'single' (Kaggle) or 'multimodal' (BraTS)
+    if "k_analysis_done" not in st.session_state:
+        st.session_state["k_analysis_done"] = False
+    if "b_analysis_done" not in st.session_state:
+        st.session_state["b_analysis_done"] = False
+
+    # 1. THEME TOGGLE (Sidebar - Light Default)
+    with st.sidebar:
+        st.markdown("### ⚙️ Display Settings")
+        theme_choice = st.radio(
+            "Theme Mode:",
+            ["☀️ Light Theme (Default)", "🌙 Dark Theme"],
+            index=0,
+            key="theme_mode_radio",
+        )
+        is_dark = "Dark" in theme_choice
+        st.markdown("---")
+        st.markdown("### 🧠 Diagnostic Architectures")
+        st.markdown(
+            """
+            - **Single-Modality:** `Swin-Tiny` (27.52M params)
+              - 4-Class Triage: *87.75% Test Acc, 0.9759 AUC*
+            - **Multi-Modal Fusion:** `Swin-Base` (86.75M params)
+              - 4-Sequence Grading: *86.73% Test Acc, 0.9677 AUC*
+              - *94.64% LGG Minority Sensitivity*
+            """
+        )
+        st.markdown("---")
+        st.caption("🔬 Software intended for research and educational validation.")
+
+    # Inject Dynamic Theme CSS
+    inject_theme_css(is_dark=is_dark)
+
+    # 2. HERO SECTION
     st.markdown(
         """
-        <style>
-        .metric-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        .metric-value {
-            font-size: 2.1rem;
-            font-weight: 700;
-            color: #38bdf8;
-            margin: 4px 0;
-        }
-        .metric-label {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #94a3b8;
-        }
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 12px;
-        }
-        .stTabs [data-baseweb="tab"] {
-            border-radius: 8px 8px 0 0;
-            padding: 10px 18px;
-            font-weight: 600;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            background: #0ea5e9;
-            color: white;
-        }
-        </style>
+        <div class="hero-container">
+            <span class="hero-badge">Clinical AI Decision Support</span>
+            <h1 class="hero-title">NeuroVision AI</h1>
+            <p class="hero-sub">
+                Explainable brain tumor diagnosis and histological grading from MRI scans, 
+                powered by Hierarchical Vision Transformers and transparent pixel-level attention maps.
+            </p>
+        </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # App Title & Header
-    st.title("🧠 Explainable Brain Tumor Diagnosis Platform")
-    st.markdown(
-        "A clinical-grade deep learning system for multi-modal brain tumor classification and histological grading, "
-        "powered by **Hierarchical Swin Transformers** and verified with **Grad-CAM** and **Attention Rollout** interpretability."
-    )
+    # 3. INTERACTIVE MODE SELECTOR (Side-by-Side Clickable Cards)
+    m_col1, m_col2 = st.columns(2)
 
-    # Sidebar: Model metadata and verified results
-    with st.sidebar:
-        st.header("🔬 Clinical AI Models")
-        st.markdown(
-            """
-            **1. Single-Modality Model**
-            - Backbone: `Swin-Tiny` (27.52M params)
-            - Benchmark: Kaggle 4-Class MRI
-            - **Accuracy:** `87.75%` | **AUC:** `0.9759`
-            - Classes: *Glioma, Meningioma, No Tumor, Pituitary*
+    is_single_active = st.session_state["selected_mode"] == "single"
+    is_multi_active = st.session_state["selected_mode"] == "multimodal"
 
-            ---
-
-            **2. Multi-Modal Fusion Model**
-            - Backbone: `Swin-Base` (86.75M params)
-            - Benchmark: BraTS 2020 Multi-Modal
-            - **Accuracy:** `86.73%` | **AUC:** `0.9677`
-            - **LGG Sensitivity:** `94.64%` (Recovered)
-            - Input: 4-Channel early fusion (`T1, T1ce, T2, FLAIR`)
-            """
-        )
-        st.markdown("---")
-        st.info(
-            "💡 **No empty uploads required:** Select any preloaded clinical case to test predictions and explainability heatmaps with one click!"
-        )
-        st.warning(
-            "⚠️ **Research Tool Only:** Intended for scientific research and coursework evaluation; not certified for clinical diagnostic use."
-        )
-
-    # Top KPI Metrics Row
-    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
     with m_col1:
+        card_class = "mode-card mode-card-active" if is_single_active else "mode-card"
         st.markdown(
-            """
-            <div class="metric-card">
-                <div class="metric-label">Kaggle Triage Accuracy</div>
-                <div class="metric-value">87.75%</div>
-                <div class="metric-label">ROC-AUC: 0.9759 (OvR)</div>
+            f"""
+            <div class="{card_class}">
+                <div class="mode-icon">📷</div>
+                <div class="mode-title">1. Single-Modality Diagnosis</div>
+                <div class="mode-desc">
+                    Upload a single 2D axial MRI slice to classify into <b>Glioma</b>, <b>Meningioma</b>, 
+                    <b>Pituitary Adenoma</b>, or <b>Healthy Control</b>.
+                </div>
+                <span class="mode-badge">Swin-Tiny • Grad-CAM • 87.75% Acc</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        if st.button("👉 Select Single-Modality Mode", key="btn_select_single", use_container_width=True):
+            st.session_state["selected_mode"] = "single"
+            st.rerun()
+
     with m_col2:
+        card_class = "mode-card mode-card-active" if is_multi_active else "mode-card"
         st.markdown(
-            """
-            <div class="metric-card">
-                <div class="metric-label">BraTS Fusion Accuracy</div>
-                <div class="metric-value">86.73%</div>
-                <div class="metric-label">ROC-AUC: 0.9677</div>
+            f"""
+            <div class="{card_class}">
+                <div class="mode-icon">🧬</div>
+                <div class="mode-title">2. Multi-Modal MRI Fusion</div>
+                <div class="mode-desc">
+                    Early-fusion of 4 co-registered sequences (<b>T1, T1ce, T2, FLAIR</b>) for fine-grained 
+                    grading of <b>Low-Grade (LGG)</b> vs. <b>High-Grade Gliomas (HGG)</b>.
+                </div>
+                <span class="mode-badge">Swin-Base • Dual XAI • 86.73% Acc</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
-    with m_col3:
-        st.markdown(
-            """
-            <div class="metric-card">
-                <div class="metric-label">Minority LGG Recall</div>
-                <div class="metric-value">94.64%</div>
-                <div class="metric-label">Surged from 0.00% Collapse</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with m_col4:
-        st.markdown(
-            """
-            <div class="metric-card">
-                <div class="metric-label">Explainability Engine</div>
-                <div class="metric-value">Dual XAI</div>
-                <div class="metric-label">Grad-CAM + Attention Rollout</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        if st.button("👉 Select Multi-Modal Fusion Mode", key="btn_select_multi", use_container_width=True):
+            st.session_state["selected_mode"] = "multimodal"
+            st.rerun()
 
     st.markdown("<br/>", unsafe_allow_html=True)
 
-    # Navigation Tabs
-    tab_overview, tab_kaggle, tab_brats = st.tabs([
-        "🏥 System Overview & Case Gallery",
-        "📷 Single-Modality Diagnosis (Kaggle)",
-        "🧬 Multi-Modal Fusion Grading (BraTS)",
-    ])
-
     # ==========================================================================
-    # TAB 1: SYSTEM OVERVIEW & CASE GALLERY
+    # WORKFLOW A: SINGLE-MODALITY DIAGNOSIS (KAGGLE)
     # ==========================================================================
-    with tab_overview:
-        st.subheader("Diagnostic Workflow & Preloaded Clinical Showcase")
+    if st.session_state["selected_mode"] == "single":
         st.markdown(
             """
-            This platform solves two fundamental challenges in neuro-oncology machine learning:
-            1. **Multi-Sequence Integration:** Stacking 4 complementary MRI contrasts (T1 native, T1-contrast, T2 water, and FLAIR edema) into an early-fusion $[4, 224, 224]$ tensor.
-            2. **Algorithmic Transparency:** Using shifted-window self-attention with pixel-level Grad-CAM backpropagation and Attention Rollout to verify that model decisions align with actual pathological tumor tissue.
-            """
-        )
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("#### 🔍 Single-Modality 4-Class Triage")
-            st.markdown(
-                """
-                - **Clinical Purpose:** Fast anatomical screening from routine 2D MRI scans.
-                - **Classes:** High-grade parenchymal **Glioma**, extra-axial **Meningioma**, sellar **Pituitary Adenoma**, and **Healthy Brains**.
-                - **Demo Available:** Preloaded cases for each tumor type available in the next tab.
-                """
-            )
-        with c2:
-            st.markdown("#### 🔬 Multi-Modal Fusion Tumor Grading")
-            st.markdown(
-                """
-                - **Clinical Purpose:** Distinguishing indolent **Low-Grade Gliomas (LGG)** from aggressive **High-Grade Gliomas (HGG)**.
-                - **Technological Breakthrough:** Resolved a severe baseline class-imbalance collapse (0% LGG recall $\\to$ 94.64% sensitivity).
-                - **Visual Display:** Saliency maps overlaid directly on **FLAIR** scans to contrast edema against suppressed CSF.
-                """
-            )
-
-        st.markdown("---")
-        st.info("👉 **To view live inference:** Click on the **'Single-Modality Diagnosis'** or **'Multi-Modal Fusion Grading'** tabs above. Preloaded cases are already active and will generate predictions immediately!")
-
-    # ==========================================================================
-    # TAB 2: KAGGLE SINGLE-MODALITY MODE
-    # ==========================================================================
-    with tab_kaggle:
-        st.subheader("Single-Modality 4-Class Brain Tumor Diagnosis")
-        st.markdown(
-            "Classifies 2D MRI scans into **Glioma**, **Meningioma**, **Pituitary**, or **No Tumor**, "
-            "rendering real-time **Grad-CAM** saliency overlays."
+            <div class="upload-card">
+                <div class="upload-card-header">📤 Step 1: Upload Brain MRI Scan</div>
+                <div class="upload-card-sub">Drag and drop any standard 2D axial, coronal, or sagittal T1/T2 MRI slice image (JPEG or PNG format).</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
         try:
@@ -425,89 +566,79 @@ def main():
             k_device = kaggle_meta["device"]
             k_classes = kaggle_meta["class_names"]
         except Exception as e:
-            st.error(f"❌ Failed to load Kaggle model: {e}")
+            st.error(f"❌ Could not load Kaggle Swin-Tiny model: {e}")
             return
 
-        # Input Mode Selector: Preloaded Demo vs Custom Upload
-        col_mode, col_select = st.columns([1, 2])
-        with col_mode:
-            k_input_mode = st.radio(
-                "Input Source:",
-                ["⚡ Preloaded Clinical Demo Case", "📁 Upload Custom MRI Image"],
-                key="k_mode_radio",
+        up_col1, up_col2 = st.columns([2, 1])
+        with up_col1:
+            k_uploaded_file = st.file_uploader(
+                "Drop your brain MRI scan here",
+                type=["jpg", "jpeg", "png"],
+                key="kaggle_file_input",
+                help="Accepts standard single MRI image files.",
             )
 
         active_k_bytes = None
-        active_k_title = ""
-        active_k_desc = ""
+        active_k_name = ""
 
-        if k_input_mode == "⚡ Preloaded Clinical Demo Case":
-            with col_select:
-                k_selected_demo = st.selectbox(
-                    "Select a Preloaded Clinical Case:",
-                    list(KAGGLE_DEMO_SAMPLES.keys()),
-                    index=0,
-                )
-            demo_info = KAGGLE_DEMO_SAMPLES[k_selected_demo]
-            active_k_title = k_selected_demo
-            active_k_desc = demo_info["description"]
-            if demo_info["path"].exists():
-                with open(demo_info["path"], "rb") as f:
-                    active_k_bytes = f.read()
-            else:
-                st.warning(f"Sample file not found at {demo_info['path']}")
-        else:
-            with col_select:
-                k_uploaded_file = st.file_uploader(
-                    "Upload MRI slice (JPG / PNG):",
-                    type=["jpg", "jpeg", "png"],
-                    key="k_file_uploader",
-                )
-            if k_uploaded_file is not None:
-                active_k_bytes = k_uploaded_file.getvalue()
-                active_k_title = k_uploaded_file.name
-                active_k_desc = "User-uploaded MRI scan."
+        if k_uploaded_file is not None:
+            active_k_bytes = k_uploaded_file.getvalue()
+            active_k_name = k_uploaded_file.name
+            with up_col2:
+                st.image(active_k_bytes, caption=f"Uploaded: {active_k_name}", width=180)
 
-        if active_k_bytes is None:
-            st.info("👆 Please upload an image or switch to '⚡ Preloaded Clinical Demo Case' to view instant results.")
-        else:
-            try:
-                raw_rgb, display_bg, img_tensor = preprocess_kaggle_image(active_k_bytes)
-            except Exception as e:
-                st.error(f"❌ Error preprocessing image: {e}")
-                return
+        # Secondary Path: Preloaded Demo Case Expander
+        with st.expander("💡 Or test with a pre-verified clinical sample (1-Click Demo)"):
+            st.caption("Select an authenticated clinical test image to run the diagnostic pipeline immediately:")
+            demo_cols = st.columns(4)
+            for idx, (d_name, d_info) in enumerate(KAGGLE_DEMO_SAMPLES.items()):
+                with demo_cols[idx]:
+                    if st.button(f"⚡ {d_name.split(' ')[0]}", key=f"btn_k_demo_{idx}", use_container_width=True):
+                        if d_info["path"].exists():
+                            with open(d_info["path"], "rb") as f:
+                                active_k_bytes = f.read()
+                            active_k_name = d_name
+                            st.session_state["k_active_demo_bytes"] = active_k_bytes
+                            st.session_state["k_active_demo_name"] = active_k_name
+                            st.rerun()
 
-            # Run Inference
-            with torch.no_grad():
-                logits = kaggle_model(img_tensor.unsqueeze(0).to(k_device))
-                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                pred_idx = int(np.argmax(probs))
-                pred_class = k_classes[pred_idx]
-                confidence = float(probs[pred_idx]) * 100.0
+            if "k_active_demo_bytes" in st.session_state and active_k_bytes is None:
+                active_k_bytes = st.session_state["k_active_demo_bytes"]
+                active_k_name = st.session_state["k_active_demo_name"]
+                with up_col2:
+                    st.image(active_k_bytes, caption=f"Demo Sample: {active_k_name}", width=180)
 
-            st.markdown(f"**Analyzing:** `{active_k_title}` — *{active_k_desc}*")
+        # Primary Action Button
+        analyze_clicked = False
+        if active_k_bytes is not None:
+            st.markdown("<br/>", unsafe_allow_html=True)
+            action_col1, action_col2 = st.columns([2, 1])
+            with action_col1:
+                analyze_clicked = st.button("🔍 Run Diagnostic Analysis & Explainability", type="primary", use_container_width=True)
+            with action_col2:
+                if st.button("🔄 Reset Scan", use_container_width=True):
+                    if "k_active_demo_bytes" in st.session_state:
+                        del st.session_state["k_active_demo_bytes"]
+                    if "k_active_demo_name" in st.session_state:
+                        del st.session_state["k_active_demo_name"]
+                    st.rerun()
 
-            # Metrics and Probability Distribution
-            res_col1, res_col2 = st.columns([1, 2])
-            with res_col1:
-                st.metric("Predicted Diagnostic Class", pred_class.capitalize())
-                st.metric("Model Confidence", f"{confidence:.2f}%")
-                if "true_label" in locals() or (k_input_mode.startswith("⚡") and "true_label" in demo_info):
-                    st.success(f"Ground Truth Label: **{demo_info['true_label']}**")
+        # Run Inference and Display Results
+        if active_k_bytes is not None and (analyze_clicked or st.session_state.get("k_auto_run", False)):
+            with st.spinner("Processing MRI scan and computing Swin Transformer Grad-CAM heatmaps..."):
+                try:
+                    raw_rgb, display_bg, img_tensor = preprocess_kaggle_image(active_k_bytes)
+                except Exception as e:
+                    st.error(f"❌ Preprocessing failed: {e}")
+                    return
 
-            with res_col2:
-                st.markdown("**Diagnostic Probability Distribution:**")
-                prob_df = pd.DataFrame(
-                    {
-                        "Diagnostic Class": [c.capitalize() for c in k_classes],
-                        "Probability (%)": probs * 100.0,
-                    }
-                ).set_index("Diagnostic Class")
-                st.bar_chart(prob_df, y="Probability (%)")
+                with torch.no_grad():
+                    logits = kaggle_model(img_tensor.unsqueeze(0).to(k_device))
+                    probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                    pred_idx = int(np.argmax(probs))
+                    pred_class = k_classes[pred_idx]
+                    confidence = float(probs[pred_idx]) * 100.0
 
-            # Grad-CAM Explainability Section
-            st.markdown("#### Visual Explainability (Grad-CAM Saliency)")
-            with st.spinner("Generating Grad-CAM heatmap..."):
                 g_cam, _, _ = generate_gradcam_heatmap(
                     model=kaggle_model,
                     image_tensor=img_tensor,
@@ -520,28 +651,77 @@ def main():
                     alpha=0.5,
                 )
 
-            col_img, col_cam = st.columns(2)
-            with col_img:
-                st.image(
-                    display_bg,
-                    caption=f"Original Axial MRI Slice (224x224): {active_k_title}",
-                    use_container_width=True,
-                )
-            with col_cam:
-                st.image(
-                    blended_overlay,
-                    caption=f"Grad-CAM Heatmap Overlay (Target: {pred_class.capitalize()} — {confidence:.2f}%)",
-                    use_container_width=True,
-                )
+            # Results Display Section
+            st.markdown(
+                f"""
+                <div class="result-card">
+                    <div style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">
+                        Diagnostic Prediction
+                    </div>
+                    <div class="result-grade">{pred_class.capitalize()}</div>
+                    <div style="font-size: 1.1rem; margin-top: 4px; color: #38bdf8;">
+                        Model Confidence: <b>{confidence:.2f}%</b>
+                    </div>
+                    <div class="confidence-meter">
+                        <div class="confidence-fill" style="width: {confidence:.1f}%;"></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # Probability Breakdown
+            st.markdown("<br/>", unsafe_allow_html=True)
+            res_c1, res_c2 = st.columns([1, 1])
+            with res_c1:
+                st.markdown("##### 📊 Class Probability Distribution")
+                for cname, p in zip(k_classes, probs):
+                    st.progress(float(p), text=f"{cname.capitalize()}: {p * 100.0:.2f}%")
+
+            with res_c2:
+                st.markdown("##### 🩺 Clinical Interpretation")
+                if pred_class.lower() == "glioma":
+                    st.info("Primary intra-axial parenchymal tumor. Recommend contrast-enhanced follow-up to evaluate microvascular proliferation.")
+                elif pred_class.lower() == "meningioma":
+                    st.info("Extra-axial dural-based lesion. Recommend neurosurgical assessment of dural tail and mass effect on cortex.")
+                elif pred_class.lower() == "pituitary":
+                    st.info("Circumscribed mass localized to the sella turcica. Recommend endocrine hormone panel and visual field evaluation.")
+                else:
+                    st.success("No focal mass effect, midline shift, or gross intracranial signal anomaly detected.")
+
+            # Heatmaps
+            st.markdown("<br/>", unsafe_allow_html=True)
+            st.markdown("##### 🎯 Visual Explainability (Grad-CAM Saliency)")
+            g_c1, g_c2 = st.columns(2)
+            with g_c1:
+                st.image(display_bg, caption=f"Original Axial MRI Slice (224x224): {active_k_name}", use_container_width=True)
+            with g_c2:
+                st.image(blended_overlay, caption=f"Grad-CAM Heatmap ({pred_class.capitalize()} — {confidence:.1f}%)", use_container_width=True)
+
+        # Collapsible Technical Model Specs (Moved OUT of primary flow)
+        with st.expander("ℹ️ About the Swin-Tiny Model & Benchmark Specifications"):
+            st.markdown(
+                """
+                - **Backbone Architecture:** `swin_tiny_patch4_window7_224` (27,516,548 parameters)
+                - **Dataset:** Kaggle 4-Class Brain Tumor MRI Dataset (7,200 total images)
+                - **Held-Out Test Set:** 1,600 balanced images (400 per class)
+                - **Test Accuracy:** **87.75%** | **Macro F1:** **0.8751** | **ROC-AUC:** **0.9759 (OvR)**
+                - **Explainability Target:** Stage 4 final normalization layer (`layers[-1].blocks[-1].norm2`)
+                """
+            )
 
     # ==========================================================================
-    # TAB 3: BRATS MULTI-MODAL FUSION MODE
+    # WORKFLOW B: MULTI-MODAL MRI FUSION (BRATS)
     # ==========================================================================
-    with tab_brats:
-        st.subheader("Multi-Modal MRI Fusion Tumor Grading (BraTS 2020)")
+    else:
         st.markdown(
-            "Stacks co-registered **T1**, **T1ce**, **T2**, and **FLAIR** sequences into a 4-channel tensor `[4, 224, 224]` "
-            "to differentiate **Low-Grade Gliomas (LGG)** from **High-Grade Gliomas (HGG)** with dual explainability."
+            """
+            <div class="upload-card">
+                <div class="upload-card-header">📤 Step 1: Upload 4 Co-Registered MRI Sequences</div>
+                <div class="upload-card-sub">Upload all 4 sequence slices from the exact same patient and slice position to perform multi-parametric early fusion.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
         try:
@@ -549,149 +729,118 @@ def main():
             b_device = brats_meta["device"]
             b_classes = brats_meta["class_names"]
         except Exception as e:
-            st.error(f"❌ Failed to load BraTS fusion model: {e}")
+            st.error(f"❌ Could not load BraTS Swin-Base model: {e}")
             return
 
-        # Input Mode Selector: Preloaded Demo vs Custom Upload
-        b_col_mode, b_col_select = st.columns([1, 2])
-        with b_col_mode:
-            b_input_mode = st.radio(
-                "Input Source:",
-                ["⚡ Preloaded Multi-Modal Patient Case", "📁 Upload 4 Custom Sequence Scans"],
-                key="b_mode_radio",
-            )
+        # 4 Dropzones Grid
+        u_t1, u_t1c, u_t2, u_flair = st.columns(4)
+
+        with u_t1:
+            st.markdown("<div class='dropzone-box'><b>1. T1 Native</b><br/><small>Anatomy & Boundaries</small></div>", unsafe_allow_html=True)
+            file_t1 = st.file_uploader("Upload T1", type=["jpg", "png", "npz"], key="b_up_t1", label_visibility="collapsed")
+
+        with u_t1c:
+            st.markdown("<div class='dropzone-box'><b>2. T1c Contrast</b><br/><small>Active Vascular Rim</small></div>", unsafe_allow_html=True)
+            file_t1c = st.file_uploader("Upload T1c", type=["jpg", "png", "npz"], key="b_up_t1c", label_visibility="collapsed")
+
+        with u_t2:
+            st.markdown("<div class='dropzone-box'><b>3. T2 Fluid</b><br/><small>Water Content & Edema</small></div>", unsafe_allow_html=True)
+            file_t2 = st.file_uploader("Upload T2", type=["jpg", "png", "npz"], key="b_up_t2", label_visibility="collapsed")
+
+        with u_flair:
+            st.markdown("<div class='dropzone-box'><b>4. FLAIR</b><br/><small>CSF-Suppressed Edema</small></div>", unsafe_allow_html=True)
+            file_flair = st.file_uploader("Upload FLAIR", type=["jpg", "png", "npz"], key="b_up_flair", label_visibility="collapsed")
+
+        uploaded_list = [file_t1, file_t1c, file_t2, file_flair]
+        uploaded_count = sum(1 for f in uploaded_list if f is not None)
 
         fused_tensor = None
         disp_t1 = disp_t1c = disp_t2 = disp_flair = None
-        active_b_title = ""
-        active_b_desc = ""
-        ground_truth_grade = None
+        active_b_name = ""
 
-        if b_input_mode == "⚡ Preloaded Multi-Modal Patient Case":
-            with b_col_select:
-                b_selected_demo = st.selectbox(
-                    "Select a Preloaded Patient Case:",
-                    list(BRATS_DEMO_SAMPLES.keys()),
-                    index=0,
-                )
-            demo_info = BRATS_DEMO_SAMPLES[b_selected_demo]
-            active_b_title = b_selected_demo
-            active_b_desc = demo_info["description"]
-            ground_truth_grade = demo_info["true_grade"]
+        # Status badge for uploads
+        if uploaded_count == 4:
+            st.success("✅ All 4 sequences uploaded! Ready for multi-modal early fusion.")
+            try:
+                arr_t1 = decode_brats_modality_bytes(file_t1.getvalue(), file_t1.name)
+                arr_t1c = decode_brats_modality_bytes(file_t1c.getvalue(), file_t1c.name)
+                arr_t2 = decode_brats_modality_bytes(file_t2.getvalue(), file_t2.name)
+                arr_flair = decode_brats_modality_bytes(file_flair.getvalue(), file_flair.name)
 
-            if demo_info["path"].exists():
-                data = np.load(demo_info["path"])
-                t1, t1ce, t2, flair = data["t1"], data["t1ce"], data["t2"], data["flair"]
-                norm_t1, disp_t1 = preprocess_brats_slice(t1)
-                norm_t1c, disp_t1c = preprocess_brats_slice(t1ce)
-                norm_t2, disp_t2 = preprocess_brats_slice(t2)
-                norm_flair, disp_flair = preprocess_brats_slice(flair)
+                norm_t1, disp_t1 = preprocess_brats_slice(arr_t1)
+                norm_t1c, disp_t1c = preprocess_brats_slice(arr_t1c)
+                norm_t2, disp_t2 = preprocess_brats_slice(arr_t2)
+                norm_flair, disp_flair = preprocess_brats_slice(arr_flair)
 
                 fused_tensor = fuse_brats_modalities(
-                    t1=norm_t1,
-                    t1ce=norm_t1c,
-                    t2=norm_t2,
-                    flair=norm_flair,
-                    target_size=(224, 224),
-                    return_tensor=True,
+                    t1=norm_t1, t1ce=norm_t1c, t2=norm_t2, flair=norm_flair,
+                    target_size=(224, 224), return_tensor=True
                 )
-            else:
-                st.warning(f"Patient file not found at {demo_info['path']}")
-        else:
-            with b_col_select:
-                st.info("Upload all 4 co-registered modality slices (T1, T1c, T2, FLAIR) or a single multi-channel `.npz` file.")
+                active_b_name = "User Multi-Modal Upload"
+            except Exception as ex:
+                st.error(f"❌ Error processing uploaded sequences: {ex}")
+        elif uploaded_count > 0:
+            st.info(f"⏳ {uploaded_count}/4 sequences uploaded. Please upload all 4 modalities to proceed.")
 
-            cu1, cu2, cu3, cu4 = st.columns(4)
-            with cu1:
-                f_t1 = st.file_uploader("1. T1 Native", type=["jpg", "png", "npz"], key="u_t1")
-            with cu2:
-                f_t1c = st.file_uploader("2. T1c Contrast", type=["jpg", "png", "npz"], key="u_t1c")
-            with cu3:
-                f_t2 = st.file_uploader("3. T2 Fluid", type=["jpg", "png", "npz"], key="u_t2")
-            with cu4:
-                f_flair = st.file_uploader("4. FLAIR", type=["jpg", "png", "npz"], key="u_flair")
+        # Secondary Path: Preloaded Multi-Modal Cohort Expander
+        with st.expander("💡 Or test with a pre-verified multi-modal patient case (1-Click Demo)"):
+            st.caption("Select an authenticated 4-sequence BraTS cohort subject to fuse and evaluate immediately:")
+            b_demo_cols = st.columns(3)
+            for idx, (b_dname, b_dinfo) in enumerate(BRATS_DEMO_SAMPLES.items()):
+                with b_demo_cols[idx]:
+                    if st.button(f"⚡ {b_dname.split(' ')[1]}", key=f"btn_b_demo_{idx}", use_container_width=True):
+                        if b_dinfo["path"].exists():
+                            data = np.load(b_dinfo["path"])
+                            t1, t1ce, t2, flair = data["t1"], data["t1ce"], data["t2"], data["flair"]
+                            norm_t1, disp_t1 = preprocess_brats_slice(t1)
+                            norm_t1c, disp_t1c = preprocess_brats_slice(t1ce)
+                            norm_t2, disp_t2 = preprocess_brats_slice(t2)
+                            norm_flair, disp_flair = preprocess_brats_slice(flair)
 
-            if all(f is not None for f in [f_t1, f_t1c, f_t2, f_flair]):
-                try:
-                    arr_t1 = decode_brats_modality_bytes(f_t1.getvalue(), f_t1.name)
-                    arr_t1c = decode_brats_modality_bytes(f_t1c.getvalue(), f_t1c.name)
-                    arr_t2 = decode_brats_modality_bytes(f_t2.getvalue(), f_t2.name)
-                    arr_flair = decode_brats_modality_bytes(f_flair.getvalue(), f_flair.name)
+                            fused_tensor = fuse_brats_modalities(
+                                t1=norm_t1, t1ce=norm_t1c, t2=norm_t2, flair=norm_flair,
+                                target_size=(224, 224), return_tensor=True
+                            )
+                            active_b_name = b_dname
+                            st.session_state["b_fused_tensor"] = fused_tensor
+                            st.session_state["b_disp_tuple"] = (disp_t1, disp_t1c, disp_t2, disp_flair)
+                            st.session_state["b_active_name"] = active_b_name
+                            st.session_state["b_active_desc"] = b_dinfo["description"]
+                            st.session_state["b_true_grade"] = b_dinfo["grade"]
+                            st.rerun()
 
-                    norm_t1, disp_t1 = preprocess_brats_slice(arr_t1)
-                    norm_t1c, disp_t1c = preprocess_brats_slice(arr_t1c)
-                    norm_t2, disp_t2 = preprocess_brats_slice(arr_t2)
-                    norm_flair, disp_flair = preprocess_brats_slice(arr_flair)
+            if "b_fused_tensor" in st.session_state and fused_tensor is None:
+                fused_tensor = st.session_state["b_fused_tensor"]
+                disp_t1, disp_t1c, disp_t2, disp_flair = st.session_state["b_disp_tuple"]
+                active_b_name = st.session_state["b_active_name"]
 
-                    fused_tensor = fuse_brats_modalities(
-                        t1=norm_t1,
-                        t1ce=norm_t1c,
-                        t2=norm_t2,
-                        flair=norm_flair,
-                        target_size=(224, 224),
-                        return_tensor=True,
-                    )
-                    active_b_title = "Custom 4-Sequence Upload"
-                    active_b_desc = "User-supplied multi-modal MRI sequences."
-                except Exception as ex:
-                    st.error(f"❌ Error processing uploaded modalities: {ex}")
+        # Primary Action Button
+        b_analyze_clicked = False
+        if fused_tensor is not None:
+            st.markdown("<br/>", unsafe_allow_html=True)
+            b_act1, b_act2 = st.columns([2, 1])
+            with b_act1:
+                b_analyze_clicked = st.button("🧬 Fuse 4 Sequences & Diagnose Tumor Grade", type="primary", use_container_width=True)
+            with b_act2:
+                if st.button("🔄 Reset Sequences", use_container_width=True):
+                    for k in ["b_fused_tensor", "b_disp_tuple", "b_active_name", "b_active_desc", "b_true_grade"]:
+                        if k in st.session_state:
+                            del st.session_state[k]
+                    st.rerun()
 
-        if fused_tensor is None:
-            st.info("👆 Please upload all 4 modalities or switch to '⚡ Preloaded Multi-Modal Patient Case' to view instant results.")
-        else:
-            st.markdown(f"**Analyzing:** `{active_b_title}` — *{active_b_desc}*")
+        # Run Inference and Display Results
+        if fused_tensor is not None and (b_analyze_clicked or st.session_state.get("b_auto_run", False)):
+            with st.spinner("Executing Swin-Base early fusion, Grad-CAM backpropagation, and Attention Rollout..."):
+                with torch.no_grad():
+                    logits = brats_model(fused_tensor.unsqueeze(0).to(b_device))
+                    probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                    pred_idx = int(np.argmax(probs))
+                    pred_grade = b_classes[pred_idx]
+                    confidence = float(probs[pred_idx]) * 100.0
 
-            # Display 4 Channels
-            st.markdown("#### 1. Fused MRI Sequence Scans (Input Channels 0–3)")
-            c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-            with c_m1:
-                st.image(disp_t1, caption="Channel 0: T1 Native", use_container_width=True)
-            with c_m2:
-                st.image(disp_t1c, caption="Channel 1: T1c Post-Contrast", use_container_width=True)
-            with c_m3:
-                st.image(disp_t2, caption="Channel 2: T2 Fluid", use_container_width=True)
-            with c_m4:
-                st.image(disp_flair, caption="Channel 3: FLAIR (Edema)", use_container_width=True)
+                grade_title = "High-Grade Glioma (HGG)" if pred_grade == "HGG" else "Low-Grade Glioma (LGG)"
 
-            # Inference
-            with torch.no_grad():
-                logits = brats_model(fused_tensor.unsqueeze(0).to(b_device))
-                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                pred_idx = int(np.argmax(probs))
-                pred_grade = b_classes[pred_idx]
-                confidence = float(probs[pred_idx]) * 100.0
-
-            grade_title = "High-Grade Glioma (HGG)" if pred_grade == "HGG" else "Low-Grade Glioma (LGG)"
-
-            # Metrics
-            st.markdown("---")
-            st.markdown("#### 2. Diagnostic Grade Prediction")
-            b_res1, b_res2 = st.columns([1, 2])
-            with b_res1:
-                st.metric("Predicted Tumor Grade", grade_title)
-                st.metric("Model Confidence", f"{confidence:.2f}%")
-                if ground_truth_grade:
-                    st.success(f"Ground Truth Grade: **{ground_truth_grade}**")
-
-            with b_res2:
-                st.markdown("**Grade Probability Breakdown:**")
-                prob_b_df = pd.DataFrame(
-                    {
-                        "Tumor Grade": ["Low-Grade Glioma (LGG)", "High-Grade Glioma (HGG)"],
-                        "Probability (%)": probs * 100.0,
-                    }
-                ).set_index("Tumor Grade")
-                st.bar_chart(prob_b_df, y="Probability (%)")
-
-            # Dual Explainability
-            st.markdown("---")
-            st.markdown("#### 3. Dual Visual Explainability (Overlaid on FLAIR Modality)")
-            st.markdown(
-                "FLAIR suppresses cerebrospinal fluid to highlight peritumoral vasogenic edema. "
-                "Below are the **Grad-CAM** gradient saliency overlay and the **Swin Attention Rollout** self-attention map."
-            )
-
-            with st.spinner("Computing Grad-CAM and Swin Attention Rollout heatmaps..."):
+                # Saliency Overlays
                 g_cam, _, _ = generate_gradcam_heatmap(
                     model=brats_model,
                     image_tensor=fused_tensor,
@@ -712,21 +861,67 @@ def main():
                     alpha=0.5,
                 )
 
-            exp_c1, exp_c2, exp_c3 = st.columns(3)
-            with exp_c1:
-                st.image(disp_flair, caption="Representative FLAIR Modality", use_container_width=True)
-            with exp_c2:
+            # Results Hero Card
+            st.markdown(
+                f"""
+                <div class="result-card">
+                    <div style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">
+                        Histological Grade Prediction
+                    </div>
+                    <div class="result-grade">{grade_title}</div>
+                    <div style="font-size: 1.1rem; margin-top: 4px; color: #38bdf8;">
+                        Model Confidence: <b>{confidence:.2f}%</b>
+                    </div>
+                    <div class="confidence-meter">
+                        <div class="confidence-fill" style="width: {confidence:.1f}%;"></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # Modality Inspection Grid
+            st.markdown("<br/>", unsafe_allow_html=True)
+            st.markdown("##### 🔬 Input 4-Channel Co-Registered MRI Sequences")
+            m1, m2, m3, m4 = st.columns(4)
+            with m1: st.image(disp_t1, caption="T1 Native", use_container_width=True)
+            with m2: st.image(disp_t1c, caption="T1c Contrast", use_container_width=True)
+            with m3: st.image(disp_t2, caption="T2 Fluid", use_container_width=True)
+            with m4: st.image(disp_flair, caption="FLAIR (CSF Suppressed)", use_container_width=True)
+
+            # Dual Explainability Grid
+            st.markdown("<br/>", unsafe_allow_html=True)
+            st.markdown("##### 🎯 Dual Visual Explainability (Overlaid on Anatomical FLAIR)")
+            st.caption("FLAIR suppresses free-water CSF to accentuate peritumoral edema. Grad-CAM isolates focal gradient activations, while Attention Rollout maps global context.")
+
+            ex1, ex2, ex3 = st.columns(3)
+            with ex1:
+                st.image(disp_flair, caption="Baseline FLAIR Sequence", use_container_width=True)
+            with ex2:
                 st.image(g_blended, caption=f"Grad-CAM Saliency ({pred_grade} — {confidence:.1f}%)", use_container_width=True)
-            with exp_c3:
+            with ex3:
                 st.image(r_blended, caption="Swin Attention Rollout (Attention Flow)", use_container_width=True)
 
-    # Footer
-    st.markdown("---")
+        # Collapsible Technical Model Specs (Moved OUT of primary flow)
+        with st.expander("ℹ️ About the Swin-Base Fusion Model & BraTS Benchmark Specifications"):
+            st.markdown(
+                """
+                - **Backbone Architecture:** `swin_base_patch4_window7_224` (86,746,478 parameters)
+                - **Input Representation:** 4-Channel early fusion (`T1`, `T1ce`, `T2`, `FLAIR`) $[4, 224, 224]$
+                - **Held-Out Test Set:** 588 patient-level slices (112 LGG, 476 HGG)
+                - **Test Accuracy:** **86.73%** | **ROC-AUC:** **0.9677** | **HGG F1:** **0.9120**
+                - **Minority LGG Sensitivity:** **94.64%** (Rescued from 0.00% majority-class collapse via loss reweighting & balanced mini-batches)
+                """
+            )
+
+    # 4. DISCREET FOOTER
     st.markdown(
-        "<p style='text-align: center; color: gray; font-size: 0.85em;'>"
-        "Explainable Brain Tumor Diagnosis Platform | Swin Transformer Multi-Modal Fusion & XAI | "
-        "Research and educational tool only — not for clinical diagnostic use."
-        "</p>",
+        """
+        <div class="footer-text">
+            NeuroVision AI • Explainable Brain Tumor Diagnosis Platform • MIT License<br/>
+            Intended strictly for scientific research and educational evaluation. Not a certified clinical device.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
