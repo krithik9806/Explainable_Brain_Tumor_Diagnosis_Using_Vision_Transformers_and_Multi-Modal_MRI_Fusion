@@ -565,6 +565,29 @@ def main():
             kaggle_model, kaggle_meta = load_kaggle_model()
             k_device = kaggle_meta["device"]
             k_classes = kaggle_meta["class_names"]
+        except FileNotFoundError as e:
+            st.error(f"❌ Checkpoint not found: `{e}`")
+            st.info(
+                "💡 **Model checkpoints (~315 MB & ~993 MB) are stored in GitHub Releases** because they exceed GitHub's 100 MB file limit.\n\n"
+                "**Option 1:** Run this command in your terminal:\n"
+                "```bash\npython scripts/download_checkpoints.py\n```\n"
+                "**Option 2:** Click the button below to download the Kaggle model checkpoint directly:"
+            )
+            if st.button("📥 Download Kaggle Model Checkpoint (~315 MB)", key="btn_dl_kaggle"):
+                with st.spinner("Downloading kaggle_best_model.pth from GitHub Releases... (please wait a moment)"):
+                    try:
+                        import scripts.download_checkpoints as dlc
+                        dest = PROJECT_ROOT / "checkpoints" / "kaggle_best_model.pth"
+                        url = dlc.MODELS["kaggle_best_model.pth"]["url"]
+                        success = dlc.download_with_progress(url, dest)
+                        if success:
+                            st.success("Successfully downloaded kaggle_best_model.pth! Reloading...")
+                            st.rerun()
+                        else:
+                            st.error("Failed to download checkpoint automatically. Please run `python scripts/download_checkpoints.py` in your terminal.")
+                    except Exception as dl_err:
+                        st.error(f"Download failed: {dl_err}. Please run `python scripts/download_checkpoints.py`.")
+            return
         except Exception as e:
             st.error(f"❌ Could not load Kaggle Swin-Tiny model: {e}")
             return
@@ -728,6 +751,29 @@ def main():
             brats_model, brats_meta = load_brats_model()
             b_device = brats_meta["device"]
             b_classes = brats_meta["class_names"]
+        except FileNotFoundError as e:
+            st.error(f"❌ Checkpoint not found: `{e}`")
+            st.info(
+                "💡 **BraTS multi-modal fusion model checkpoint (~993 MB) is stored in GitHub Releases** because it exceeds GitHub's 100 MB file limit.\n\n"
+                "**Option 1:** Run this command in your terminal:\n"
+                "```bash\npython scripts/download_checkpoints.py\n```\n"
+                "**Option 2:** Click the button below to download the BraTS model checkpoint directly:"
+            )
+            if st.button("📥 Download BraTS Model Checkpoint (~993 MB)", key="btn_dl_brats"):
+                with st.spinner("Downloading brats_best_model.pth from GitHub Releases... (please wait a few minutes)"):
+                    try:
+                        import scripts.download_checkpoints as dlc
+                        dest = PROJECT_ROOT / "checkpoints" / "brats_best_model.pth"
+                        url = dlc.MODELS["brats_best_model.pth"]["url"]
+                        success = dlc.download_with_progress(url, dest)
+                        if success:
+                            st.success("Successfully downloaded brats_best_model.pth! Reloading...")
+                            st.rerun()
+                        else:
+                            st.error("Failed to download checkpoint automatically. Please run `python scripts/download_checkpoints.py` in your terminal.")
+                    except Exception as dl_err:
+                        st.error(f"Download failed: {dl_err}. Please run `python scripts/download_checkpoints.py`.")
+            return
         except Exception as e:
             st.error(f"❌ Could not load BraTS Swin-Base model: {e}")
             return

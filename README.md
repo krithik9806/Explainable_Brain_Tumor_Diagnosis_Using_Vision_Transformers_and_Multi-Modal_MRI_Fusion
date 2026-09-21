@@ -226,7 +226,14 @@ venv\Scripts\activate          # Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Reproduce Test Set Evaluations
+### 2. Download Pretrained Checkpoints
+Due to GitHub's 100 MB per-file limit, trained model weights (~315 MB and ~993 MB) are hosted as GitHub Release assets. Download them automatically into `checkpoints/` with one command:
+```bash
+python scripts/download_checkpoints.py
+```
+*(Or if running the Streamlit app, simply click the in-app download button when prompted).*
+
+### 3. Reproduce Test Set Evaluations
 ```bash
 # Evaluate Kaggle 4-Class Model (Reproduces 87.75% Acc, 0.9759 AUC)
 python src/evaluate.py -c checkpoints/kaggle_best_model.pth -cfg configs/kaggle_config.yaml -p kaggle
@@ -235,7 +242,7 @@ python src/evaluate.py -c checkpoints/kaggle_best_model.pth -cfg configs/kaggle_
 python src/evaluate.py -c checkpoints/brats_best_model.pth -cfg configs/brats_fusion_config.yaml -p brats
 ```
 
-### 3. Generate Visual Saliency Maps
+### 4. Generate Visual Saliency Maps
 ```bash
 # Run Grad-CAM across both benchmark test sets
 python src/explain.py --dataset all
@@ -244,7 +251,7 @@ python src/explain.py --dataset all
 python src/attention_rollout.py --dataset all
 ```
 
-### 4. Run End-to-End Automated Test Suite
+### 5. Run End-to-End Automated Test Suite
 ```bash
 python tests/test_brats_app_flow.py
 ```
