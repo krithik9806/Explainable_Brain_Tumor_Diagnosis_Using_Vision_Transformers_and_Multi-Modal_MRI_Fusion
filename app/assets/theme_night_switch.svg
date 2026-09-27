@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 92" width="220" height="92">
+  <defs>
+    <!-- Capsule Clip Path -->
+    <clipPath id="nightCapsuleClip">
+      <rect x="2" y="2" width="216" height="88" rx="44" ry="44" />
+    </clipPath>
+
+    <!-- Night Sky Gradient -->
+    <linearGradient id="nightSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141c38" />
+      <stop offset="50%" stop-color="#1a254b" />
+      <stop offset="100%" stop-color="#2a3869" />
+    </linearGradient>
+
+    <!-- Moon Halo Rings Gradients -->
+    <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="40%" stop-color="#e2e8f8" stop-opacity="0.45" />
+      <stop offset="80%" stop-color="#a8bce0" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#a8bce0" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Night Mountain Gradients -->
+    <linearGradient id="nightLeftHill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#203058" />
+      <stop offset="100%" stop-color="#152140" />
+    </linearGradient>
+
+    <linearGradient id="nightMidHill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c3e6b" />
+      <stop offset="100%" stop-color="#1d2a4d" />
+    </linearGradient>
+
+    <linearGradient id="nightRightHill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1b284c" />
+      <stop offset="100%" stop-color="#111c38" />
+    </linearGradient>
+
+    <!-- Night River Gradient -->
+    <linearGradient id="nightRiverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2e4274" />
+      <stop offset="50%" stop-color="#3c5594" />
+      <stop offset="100%" stop-color="#4965aa" />
+    </linearGradient>
+
+    <!-- Knob Drop Shadow (Shadow falls to the left) -->
+    <filter id="nightKnobShadow" x="-30%" y="-30%" width="170%" height="170%">
+      <feDropShadow dx="-3" dy="2" stdDeviation="4.5" flood-color="#050a16" flood-opacity="0.55" />
+    </filter>
+
+    <!-- Night Inner Capsule Rim Shadow -->
+    <linearGradient id="nightTopInnerShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#080c18" stop-opacity="0.6" />
+      <stop offset="25%" stop-color="#080c18" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#080c18" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Capsule Outline Rim -->
+  <rect x="1" y="1" width="218" height="90" rx="45" ry="45" fill="#0d1428" />
+  <rect x="2" y="2" width="216" height="88" rx="44" ry="44" fill="#182342" />
+
+  <!-- Inside Clipped Night Landscape -->
+  <g clip-path="url(#nightCapsuleClip)">
+    <!-- Deep Navy Sky -->
+    <rect x="0" y="0" width="220" height="92" fill="url(#nightSky)" />
+
+    <!-- Concentric Moon Halo Rings (as seen in reference) -->
+    <circle cx="118" cy="25" r="46" fill="#ffffff" opacity="0.04" />
+    <circle cx="118" cy="25" r="34" fill="#ffffff" opacity="0.07" />
+    <circle cx="118" cy="25" r="24" fill="url(#moonGlow)" />
+
+    <!-- Night Clouds Behind/Under Moon -->
+    <ellipse cx="88" cy="38" rx="22" ry="13" fill="#364973" opacity="0.6" />
+    <ellipse cx="148" cy="38" rx="26" ry="14" fill="#364973" opacity="0.6" />
+
+    <!-- Glowing Moon -->
+    <circle cx="118" cy="25" r="12" fill="#ffffff" />
+    <circle cx="118" cy="25" r="12" fill="#f0f4ff" opacity="0.95" />
+
+    <!-- Front Night Clouds Framing Moon -->
+    <circle cx="82" cy="42" r="15" fill="#425785" opacity="0.75" />
+    <circle cx="98" cy="44" r="13" fill="#4a6194" opacity="0.8" />
+    <circle cx="138" cy="42" r="17" fill="#425785" opacity="0.75" />
+
+    <!-- Distant Night Mountain Peaks -->
+    <path d="M 0 92 L 0 54 Q 55 42 105 65 L 105 92 Z" fill="url(#nightMidHill)" />
+    <path d="M 85 92 Q 130 50 180 62 Q 200 68 220 70 L 220 92 Z" fill="url(#nightRightHill)" />
+
+    <!-- Night Winding River -->
+    <path d="M 98 64 
+             C 108 68, 134 70, 128 76 
+             C 122 81, 94 80, 98 86 
+             C 102 90, 140 92, 150 92 
+             L 88 92 
+             C 86 86, 100 81, 104 78 
+             C 108 74, 90 70, 86 65 Z" 
+          fill="url(#nightRiverGrad)" />
+
+    <!-- Main Left Sloping Mountain/Ridge (Foreground) -->
+    <path d="M 0 92 L 0 58 Q 65 52 104 92 Z" fill="url(#nightLeftHill)" />
+
+    <!-- Right Shoreline Baseline -->
+    <path d="M 104 92 Q 145 68 220 62 L 220 92 Z" fill="#16223f" />
+
+    <!-- Night Pine Trees Forest (On the LEFT hill, matching reference image) -->
+    <!-- Distant Row of Pine Trees (Dark Navy Silhouettes) -->
+    <polygon points="6,62 10,48 14,62" fill="#0b1324" />
+    <polygon points="12,60 16,45 20,60" fill="#080e1c" />
+    <polygon points="18,58 22,42 26,58" fill="#0b1324" />
+    <polygon points="24,56 28,38 32,56" fill="#080e1c" />
+    <polygon points="30,58 35,42 40,58" fill="#0b1324" />
+    <polygon points="38,62 43,46 48,62" fill="#080e1c" />
+    <polygon points="46,65 51,50 56,65" fill="#0b1324" />
+    <polygon points="54,68 59,54 64,68" fill="#080e1c" />
+    <polygon points="62,72 67,58 72,72" fill="#0b1324" />
+    <polygon points="70,76 75,64 80,76" fill="#080e1c" />
+
+    <!-- Front Row of Pine Trees (Mid-tone Silhouette Forest) -->
+    <polygon points="4,70 9,55 14,70" fill="#121e38" />
+    <polygon points="11,68 16,50 21,68" fill="#0f1930" />
+    <polygon points="18,66 23,48 28,66" fill="#14213d" />
+    <polygon points="25,65 30,46 35,65" fill="#101c34" />
+    <polygon points="33,68 38,52 43,68" fill="#14213d" />
+    <polygon points="41,72 46,56 51,72" fill="#101c34" />
+    <polygon points="49,75 54,60 59,75" fill="#14213d" />
+    <polygon points="57,78 62,65 67,78" fill="#101c34" />
+    <polygon points="65,82 70,70 75,82" fill="#14213d" />
+    <polygon points="73,86 78,74 83,86" fill="#101c34" />
+
+    <!-- Foreground Trees down near the water -->
+    <polygon points="118,88 120,79 122,88" fill="#101c34" />
+    <polygon points="122,90 125,78 128,90" fill="#14213d" />
+    <polygon points="128,92 131,82 134,92" fill="#0f1930" />
+
+    <!-- Inner Capsule Depth Shadow (Inset depth from top) -->
+    <rect x="0" y="0" width="220" height="92" fill="url(#nightTopInnerShadow)" pointer-events="none" />
+
+    <!-- NIGHT KNOB (Circular Solid Button on the RIGHT) -->
+    <g filter="url(#nightKnobShadow)">
+      <!-- Outer Knob Bevel -->
+      <circle cx="174" cy="46" r="37.5" fill="#cdd8e6" />
+      <!-- Main Knob Face -->
+      <circle cx="174" cy="45" r="36" fill="#edf2f7" />
+      <circle cx="174" cy="44.5" r="35" fill="#ffffff" />
+    </g>
+  </g>
+</svg>

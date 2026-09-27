@@ -4,7 +4,11 @@ gatherUsageStats = false
 [server]
 headless = true
 port = 8501
+address = "localhost"
 enableCORS = false
+enableXsrfProtection = false
+runOnSave = true
+
 
 [theme]
 base = "light"

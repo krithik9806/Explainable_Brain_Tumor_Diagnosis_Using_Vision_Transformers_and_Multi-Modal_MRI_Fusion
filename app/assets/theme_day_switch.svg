@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 92" width="220" height="92">
+  <defs>
+    <!-- Capsule Clip Path -->
+    <clipPath id="dayCapsuleClip">
+      <rect x="2" y="2" width="216" height="88" rx="44" ry="44" />
+    </clipPath>
+
+    <!-- Sky Gradient -->
+    <linearGradient id="daySky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7fc1eb" />
+      <stop offset="45%" stop-color="#9ad5f5" />
+      <stop offset="100%" stop-color="#d6edfc" />
+    </linearGradient>
+
+    <!-- Sun Halo / Glow -->
+    <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff59d" stop-opacity="0.9" />
+      <stop offset="45%" stop-color="#ffee58" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#fff9c4" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Sun Core -->
+    <linearGradient id="sunCore" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff176" />
+      <stop offset="100%" stop-color="#fbc02d" />
+    </linearGradient>
+
+    <!-- Green Hills Gradients -->
+    <linearGradient id="leftHill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7cd672" />
+      <stop offset="100%" stop-color="#56b856" />
+    </linearGradient>
+
+    <linearGradient id="midHill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6ecb66" />
+      <stop offset="100%" stop-color="#46a84c" />
+    </linearGradient>
+
+    <linearGradient id="rightHill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#58bd58" />
+      <stop offset="100%" stop-color="#3b9642" />
+    </linearGradient>
+
+    <!-- River Gradient -->
+    <linearGradient id="riverGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d8f3fe" />
+      <stop offset="50%" stop-color="#b8e8fc" />
+      <stop offset="100%" stop-color="#8fd7f7" />
+    </linearGradient>
+
+    <!-- Knob Drop Shadow -->
+    <filter id="knobShadow" x="-30%" y="-30%" width="170%" height="170%">
+      <feDropShadow dx="3" dy="2" stdDeviation="4.5" flood-color="#0f2b1a" flood-opacity="0.32" />
+    </filter>
+
+    <!-- Inner Capsule Rim Shadow -->
+    <linearGradient id="topInnerShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2a5a78" stop-opacity="0.35" />
+      <stop offset="25%" stop-color="#2a5a78" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#2a5a78" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Capsule Outline Rim -->
+  <rect x="1" y="1" width="218" height="90" rx="45" ry="45" fill="#99bad2" />
+  <rect x="2" y="2" width="216" height="88" rx="44" ry="44" fill="#bcd6e8" />
+
+  <!-- Inside Clipped Landscape -->
+  <g clip-path="url(#dayCapsuleClip)">
+    <!-- Sky -->
+    <rect x="0" y="0" width="220" height="92" fill="url(#daySky)" />
+
+    <!-- Clouds Behind Sun -->
+    <ellipse cx="92" cy="38" rx="22" ry="14" fill="#ffffff" opacity="0.75" />
+    <ellipse cx="140" cy="36" rx="26" ry="15" fill="#ffffff" opacity="0.8" />
+    <ellipse cx="160" cy="40" rx="20" ry="12" fill="#ffffff" opacity="0.75" />
+
+    <!-- Sun Glow and Body -->
+    <circle cx="118" cy="25" r="22" fill="url(#sunHalo)" />
+    <circle cx="118" cy="25" r="12" fill="url(#sunCore)" />
+
+    <!-- Front Fluffy Clouds -->
+    <circle cx="86" cy="42" r="16" fill="#ffffff" opacity="0.85" />
+    <circle cx="146" cy="40" r="18" fill="#ffffff" opacity="0.9" />
+
+    <!-- Distant Left Hill -->
+    <path d="M 40 92 Q 95 48 135 68 L 135 92 Z" fill="url(#leftHill)" />
+
+    <!-- Distant Right Mountain Ridge -->
+    <path d="M 110 92 Q 140 42 185 58 Q 205 66 220 72 L 220 92 Z" fill="url(#midHill)" />
+
+    <!-- Winding River -->
+    <path d="M 124 64 
+             C 112 68, 86 70, 92 76 
+             C 98 81, 126 80, 122 86 
+             C 118 90, 80 92, 70 92 
+             L 132 92 
+             C 134 86, 120 81, 116 78 
+             C 112 74, 130 70, 134 65 Z" 
+          fill="url(#riverGrad)" />
+
+    <!-- Main Right Green Hill (Sloping Down to River) -->
+    <path d="M 116 92 Q 155 52 220 54 L 220 92 Z" fill="url(#rightHill)" />
+
+    <!-- Left Valley Bank -->
+    <path d="M 0 92 L 0 58 Q 50 62 90 92 Z" fill="#60be5a" />
+
+    <!-- Pine Trees Forest (Right Foreground Hill) -->
+    <!-- Tree 1 -->
+    <polygon points="120,84 122,78 124,84" fill="#2d6e32" />
+    <polygon points="121,80 122,75 123,80" fill="#388e3c" />
+    <!-- Tree 2 -->
+    <polygon points="124,88 127,80 130,88" fill="#255c29" />
+    <polygon points="125,82 127,77 129,82" fill="#2e7d32" />
+
+    <!-- Pine Tree Silhouettes along the hill slope -->
+    <!-- Back row (Dark Forest Green) -->
+    <polygon points="135,76 138,66 141,76" fill="#235c28" />
+    <polygon points="140,73 143,62 146,73" fill="#1e4e22" />
+    <polygon points="146,71 149,58 152,71" fill="#235c28" />
+    <polygon points="151,68 154,54 157,68" fill="#1e4e22" />
+    <polygon points="157,64 160,50 163,64" fill="#235c28" />
+    <polygon points="163,60 166,45 169,60" fill="#1e4e22" />
+    <polygon points="170,58 173,42 176,58" fill="#235c28" />
+    <polygon points="177,56 181,38 185,56" fill="#1e4e22" />
+    <polygon points="185,55 189,40 193,55" fill="#235c28" />
+    <polygon points="193,56 197,42 201,56" fill="#1e4e22" />
+    <polygon points="201,58 205,45 209,58" fill="#235c28" />
+    <polygon points="210,60 214,48 218,60" fill="#1e4e22" />
+
+    <!-- Front row trees (Vibrant Layered Green) -->
+    <polygon points="132,84 136,70 140,84" fill="#2e7d32" />
+    <polygon points="138,80 142,67 146,80" fill="#388e3c" />
+    <polygon points="144,78 148,63 152,78" fill="#2e7d32" />
+    <polygon points="150,75 154,59 158,75" fill="#388e3c" />
+    <polygon points="156,72 161,56 166,72" fill="#2e7d32" />
+    <polygon points="164,68 169,52 174,68" fill="#388e3c" />
+    <polygon points="172,66 177,48 182,66" fill="#2e7d32" />
+    <polygon points="180,64 185,46 190,64" fill="#388e3c" />
+    <polygon points="188,65 193,50 198,65" fill="#2e7d32" />
+    <polygon points="196,67 201,52 206,67" fill="#388e3c" />
+    <polygon points="204,70 209,56 214,70" fill="#2e7d32" />
+
+    <!-- Pine trees on the left riverbank -->
+    <polygon points="82,88 84,79 86,88" fill="#2e7d32" />
+    <polygon points="86,90 89,78 92,90" fill="#235c28" />
+    <polygon points="92,92 95,82 98,92" fill="#388e3c" />
+
+    <!-- Inner Capsule Shadow (Inset depth at top and sides) -->
+    <rect x="0" y="0" width="220" height="92" fill="url(#topInnerShadow)" pointer-events="none" />
+
+    <!-- DAY KNOB (Circular Solid Button on the LEFT) -->
+    <g filter="url(#knobShadow)">
+      <!-- Outer Knob Bevel -->
+      <circle cx="46" cy="46" r="37.5" fill="#dce6ef" />
+      <!-- Main Knob Face -->
+      <circle cx="45" cy="45" r="36" fill="#f4f7fa" />
+      <circle cx="44.5" cy="44.5" r="35" fill="#ffffff" />
+    </g>
+  </g>
+</svg>
