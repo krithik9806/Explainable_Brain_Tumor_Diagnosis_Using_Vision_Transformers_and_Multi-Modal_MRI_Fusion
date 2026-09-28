@@ -230,6 +230,9 @@ def preprocess_kaggle_image(file_bytes: bytes) -> Tuple[np.ndarray, np.ndarray, 
     return img_rgb, display_bg, image_tensor
 
 
+preprocess_uploaded_image = preprocess_kaggle_image
+
+
 def decode_brats_modality_bytes(file_bytes: bytes, filename: str) -> np.ndarray:
     if file_bytes.startswith(b"\x93NUMPY"):
         return np.load(io.BytesIO(file_bytes)).astype(np.float32)
@@ -273,20 +276,13 @@ def inject_brainwave_theme(is_dark: bool = False):
     - Asymmetric bento grid with floating 3D brain card animation.
     - Polished buttons, badges, sliders, and tab bars.
     """
-    day_path = PROJECT_ROOT / "app" / "assets" / "theme_day_switch.svg"
-    night_path = PROJECT_ROOT / "app" / "assets" / "theme_night_switch.svg"
-    day_mtime = day_path.stat().st_mtime if day_path.exists() else 0.0
-    night_mtime = night_path.stat().st_mtime if night_path.exists() else 0.0
-    day_switch_b64 = get_base64_image(day_path, _mtime=day_mtime)
-    night_switch_b64 = get_base64_image(night_path, _mtime=night_mtime)
-    active_toggle_bg = night_switch_b64 if is_dark else day_switch_b64
-
     if is_dark:
         bg_canvas = "radial-gradient(circle at 10% 20%, rgba(30, 27, 75, 0.9) 0%, rgba(49, 23, 62, 0.8) 45%, rgba(15, 23, 42, 0.98) 100%), #0b0f19"
         card_bg = "rgba(22, 28, 48, 0.88)"
         card_border = "rgba(255, 255, 255, 0.12)"
         card_sub_bg = "#162036"
         text_hero = "#f8fafc"
+        text_body = "#e2e8f0"
         text_sub = "#94a3b8"
         accent_color = "#818cf8"
         accent_gradient = "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)"
@@ -323,12 +319,33 @@ def inject_brainwave_theme(is_dark: bool = False):
         chip_bg = "rgba(255, 255, 255, 0.08)"
         chip_border = "rgba(255, 255, 255, 0.12)"
         chip_text = "#cbd5e1"
+        code_bg = "rgba(99, 102, 241, 0.22)"
+        code_color = "#c7d2fe"
+        code_border = "rgba(129, 140, 248, 0.4)"
+        table_header_bg = "#1e293b"
+        table_header_text = "#ffffff"
+        table_cell_bg = "#161f36"
+        table_cell_text = "#f1f5f9"
+        table_border = "rgba(255, 255, 255, 0.14)"
+        green_accent = "#4ade80"
+        # Sliding Theme Switcher Variables (Night Mode)
+        toggle_track_bg = "linear-gradient(135deg, #1e1b4b 0%, #2e1065 55%, #0f172a 100%)"
+        toggle_track_border = "rgba(168, 85, 247, 0.7)"
+        toggle_track_shadow = "inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(168, 85, 247, 0.45)"
+        toggle_knob_bg = "linear-gradient(135deg, #f8fafc 0%, #c7d2fe 100%)"
+        toggle_knob_shadow = "0 3px 10px rgba(0, 0, 0, 0.5), 0 0 14px rgba(199, 210, 254, 0.85)"
+        toggle_knob_content = "'🌙'"
+        toggle_knob_transform = "translateX(38px)"
+        toggle_accent_content = "'✨'"
+        toggle_accent_side = "left: 11px; right: auto;"
+        toggle_animation = "slideToNight 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
     else:
         bg_canvas = "radial-gradient(circle at 12% 18%, rgba(226, 218, 252, 0.75) 0%, rgba(254, 230, 238, 0.65) 42%, rgba(220, 234, 254, 0.75) 90%), #f5f6fb"
         card_bg = "rgba(255, 255, 255, 0.88)"
         card_border = "rgba(255, 255, 255, 0.9)"
         card_sub_bg = "#ffffff"
         text_hero = "#0f172a"
+        text_body = "#334155"
         text_sub = "#64748b"
         accent_color = "#4f46e5"
         accent_gradient = "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
@@ -365,15 +382,118 @@ def inject_brainwave_theme(is_dark: bool = False):
         chip_bg = "rgba(241, 245, 249, 0.9)"
         chip_border = "rgba(226, 232, 240, 0.9)"
         chip_text = "#475569"
+        code_bg = "rgba(241, 245, 249, 0.9)"
+        code_color = "#3730a3"
+        code_border = "rgba(203, 213, 225, 0.8)"
+        table_header_bg = "#f8fafc"
+        table_header_text = "#0f172a"
+        table_cell_bg = "#ffffff"
+        table_cell_text = "#334155"
+        table_border = "rgba(226, 232, 240, 0.9)"
+        green_accent = "#16a34a"
+        # Sliding Theme Switcher Variables (Day Mode)
+        toggle_track_bg = "linear-gradient(135deg, #38bdf8 0%, #818cf8 100%)"
+        toggle_track_border = "rgba(255, 255, 255, 0.95)"
+        toggle_track_shadow = "inset 0 2px 5px rgba(0, 0, 0, 0.2), 0 4px 14px rgba(56, 189, 248, 0.45)"
+        toggle_knob_bg = "linear-gradient(135deg, #ffffff 0%, #fef08a 100%)"
+        toggle_knob_shadow = "0 3px 10px rgba(0, 0, 0, 0.25), 0 0 12px rgba(250, 204, 21, 0.85)"
+        toggle_knob_content = "'☀️'"
+        toggle_knob_transform = "translateX(0px)"
+        toggle_accent_content = "'☁️'"
+        toggle_accent_side = "right: 11px; left: auto;"
+        toggle_animation = "slideToDay 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
+
 
     css = f"""
     <style>
-    /* Global Viewport Reset */
+    /* Theme Toggle Keyframe Animations */
+    @keyframes slideToNight {{
+        0% {{ transform: translateX(0px); }}
+        100% {{ transform: translateX(38px); }}
+    }}
+    @keyframes slideToDay {{
+        0% {{ transform: translateX(38px); }}
+        100% {{ transform: translateX(0px); }}
+    }}
+
+    /* Testing & Screen-Reader Accessible Header */
+    .sr-only-title,
+    .sr-only-title h1,
+    div:has(> .sr-only-title) {{
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }}
+
+    /* Global Viewport Reset & Universal Typography Contrast */
     .stApp {{
         background: {bg_canvas} !important;
         background-attachment: fixed !important;
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        color: {text_hero};
+        color: {text_body} !important;
+    }}
+
+    /* Global Headings High Contrast */
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+    div[data-testid="stMarkdownContainer"] h1,
+    div[data-testid="stMarkdownContainer"] h2,
+    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] h4,
+    div[data-testid="stMarkdownContainer"] h5,
+    div[data-testid="stMarkdownContainer"] h6,
+    div[data-testid="stMarkdownContainer"] strong,
+    div[data-testid="stMarkdownContainer"] b,
+    .stApp strong,
+    .stApp b {{
+        color: {text_hero} !important;
+    }}
+
+    /* Global Body, Paragraphs, Lists & Labels */
+    .stApp p,
+    .stApp li,
+    .stApp label,
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] li,
+    div[data-testid="stMarkdownContainer"] span:not(.bw-brand-badge):not(.mode-chip-acc):not(.bento-pill-arrow):not(.showcase-circle-arrow):not(.bw-status-dot) {{
+        color: {text_body} !important;
+    }}
+
+    /* Captions & Subtle Text */
+    .stCaption,
+    div[data-testid="stCaptionContainer"],
+    div[data-testid="stCaptionContainer"] p,
+    div[data-testid="stCaptionContainer"] span,
+    .stApp small {{
+        color: {text_sub} !important;
+    }}
+
+    /* Inline Code Pills */
+    code,
+    .stApp code,
+    div[data-testid="stMarkdownContainer"] code {{
+        background: {code_bg} !important;
+        color: {code_color} !important;
+        border: 1px solid {code_border} !important;
+        border-radius: 6px !important;
+        padding: 2px 6px !important;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
+        font-size: 0.86em !important;
+        font-weight: 600 !important;
+    }}
+
+    /* Universal Dividers */
+    hr,
+    .stApp hr {{
+        border: 0 !important;
+        border-top: 1px solid {card_border} !important;
+        margin: 1.2rem 0 !important;
+        opacity: 0.85 !important;
     }}
 
     /* Completely hide Streamlit sidebar and its toggle button */
@@ -402,7 +522,7 @@ def inject_brainwave_theme(is_dark: bool = False):
         -webkit-backdrop-filter: blur(28px);
         border: 1px solid {card_border};
         border-radius: 36px;
-        box-shadow: {inner_shadow}, 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+        box-shadow: {inner_shadow}, 0 0 0 1px {card_border} inset;
         padding: 2.2rem 2.8rem 3rem 2.8rem;
         margin-bottom: 2rem;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -414,8 +534,13 @@ def inject_brainwave_theme(is_dark: bool = False):
         align-items: center;
         justify-content: space-between;
         padding-bottom: 1.8rem;
-        border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+        border-bottom: 1px solid {nav_divider_bg};
         margin-bottom: 2.2rem;
+    }}
+    .bw-nav-divider {{
+        height: 1px;
+        background: {nav_divider_bg};
+        margin: 1.5rem 0 2rem 0;
     }}
     .bw-brand {{
         display: flex;
@@ -483,12 +608,12 @@ def inject_brainwave_theme(is_dark: bool = False):
         background: {card_sub_bg};
         border-radius: 28px;
         padding: 2.8rem 2.5rem;
-        box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(241, 245, 249, 0.9);
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         min-height: 380px;
-        border: 1px solid rgba(226, 232, 240, 0.6);
+        border: 1px solid {card_border};
         transition: transform 0.25s ease, box-shadow 0.25s ease;
     }}
     .bento-card-main:hover {{
@@ -546,12 +671,12 @@ def inject_brainwave_theme(is_dark: bool = False):
         background: {card_sub_bg};
         border-radius: 26px;
         padding: 1.4rem 1.6rem;
-        box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08);
         display: flex;
         align-items: center;
         gap: 1.4rem;
         margin-top: 1.6rem;
-        border: 1px solid rgba(226, 232, 240, 0.6);
+        border: 1px solid {card_border};
         transition: transform 0.25s ease, box-shadow 0.25s ease;
     }}
     .bento-card-sub:hover {{
@@ -934,13 +1059,16 @@ def inject_brainwave_theme(is_dark: bool = False):
         border: 1px solid {card_border} !important;
         border-radius: 18px !important;
         overflow: hidden !important;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
         margin-top: 1rem !important;
         margin-bottom: 1.5rem !important;
     }}
     div[data-testid="stExpander"] details summary {{
         padding: 0.9rem 1.2rem !important;
         font-weight: 600 !important;
+        color: {text_hero} !important;
+    }}
+    div[data-testid="stExpander"] details summary * {{
         color: {text_hero} !important;
     }}
     div[data-testid="stExpander"] details summary:hover {{
@@ -950,29 +1078,72 @@ def inject_brainwave_theme(is_dark: bool = False):
         padding: 1.2rem !important;
         border-top: 1px solid {card_border} !important;
     }}
+    div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] p,
+    div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] span,
+    div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] strong,
+    div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] b {{
+        color: {text_hero} !important;
+    }}
 
     /* Diagnostic Result & Metric Cards */
     .metric-bento-card {{
-        background: {card_sub_bg};
-        border-radius: 20px;
-        padding: 1.6rem;
-        border: 1px solid {card_border};
-        box-shadow: 0 8px 24px -5px rgba(15, 23, 42, 0.05);
-        text-align: left;
+        background: {card_sub_bg} !important;
+        border-radius: 20px !important;
+        padding: 1.6rem !important;
+        border: 1px solid {card_border} !important;
+        box-shadow: 0 8px 24px -5px rgba(0, 0, 0, 0.08) !important;
+        text-align: left !important;
+    }}
+    .metric-bento-card p {{
+        color: {text_sub} !important;
+    }}
+    .metric-bento-card ul,
+    .metric-bento-card ol,
+    .metric-bento-card li {{
+        color: {text_body} !important;
+    }}
+    .metric-bento-card b,
+    .metric-bento-card strong {{
+        color: {text_hero} !important;
     }}
     .metric-bento-val {{
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: {accent_color};
-        line-height: 1.1;
-        margin-bottom: 0.3rem;
+        font-size: 2.2rem !important;
+        font-weight: 800 !important;
+        color: {accent_color} !important;
+        line-height: 1.1 !important;
+        margin-bottom: 0.3rem !important;
     }}
     .metric-bento-label {{
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: {text_sub};
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        color: {text_sub} !important;
+    }}
+    .metric-channel-title {{
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        color: {accent_color} !important;
+    }}
+    .metric-sub-detail {{
+        font-size: 0.95rem !important;
+        color: {text_sub} !important;
+    }}
+    .kpi-sub-text {{
+        font-size: 0.82rem !important;
+        color: {green_accent} !important;
+        font-weight: 700 !important;
+    }}
+    .mode-bento-badge {{
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.06em !important;
+        text-transform: uppercase !important;
+        padding: 4px 10px !important;
+        border-radius: 9999px !important;
+        background: {chip_bg} !important;
+        color: {chip_text} !important;
+        border: 1px solid {chip_border} !important;
     }}
 
     /* All Streamlit Buttons Polish & Absolute Visibility Guarantee (EXCEPT Day/Night toggle) */
@@ -1082,14 +1253,13 @@ def inject_brainwave_theme(is_dark: bool = False):
         margin: 0.8rem 0 2rem 0;
     }}
 
-    /* Realistic Day / Night Switch Button (Matching Reference Design 1:1) */
+    /* Animated Day / Night Sliding Toggle Switch */
     div.st-key-theme_toggle_btn,
     div.st-key-theme_toggle_btn.stButton {{
         display: flex !important;
         justify-content: flex-end !important;
         align-items: center !important;
         width: 100% !important;
-        min-width: 110px !important;
     }}
     div.st-key-theme_toggle_btn button,
     div.st-key-theme_toggle_btn button[kind="secondary"],
@@ -1100,32 +1270,70 @@ def inject_brainwave_theme(is_dark: bool = False):
         box-sizing: border-box !important;
         display: block !important;
         position: relative !important;
-        width: 110px !important;
-        min-width: 110px !important;
-        max-width: 110px !important;
-        height: 46px !important;
-        min-height: 46px !important;
-        max-height: 46px !important;
+        width: 80px !important;
+        min-width: 80px !important;
+        max-width: 80px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
         border-radius: 9999px !important;
         overflow: hidden !important;
         cursor: pointer !important;
         padding: 0 !important;
         margin: 0 !important;
-        border: none !important;
+        border: 2px solid {toggle_track_border} !important;
         outline: none !important;
+        background: {toggle_track_bg} !important;
         background-color: transparent !important;
-        background-image: url('{active_toggle_bg}') !important;
-        background-repeat: no-repeat !important;
-        background-position: center center !important;
-        background-size: 100% 100% !important;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28) !important;
-        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease !important;
+        box-shadow: {toggle_track_shadow} !important;
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease !important;
         -webkit-appearance: none !important;
         appearance: none !important;
     }}
     div.st-key-theme_toggle_btn button:hover {{
-        transform: translateY(-2px) scale(1.06) !important;
-        box-shadow: 0 8px 26px rgba(99, 102, 241, 0.5) !important;
+        transform: scale(1.06) !important;
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5) !important;
+        filter: brightness(1.08) !important;
+    }}
+    /* Decorative Track Accent (Cloud in Day, Sparkles in Night) */
+    div.st-key-theme_toggle_btn button::after {{
+        content: {toggle_accent_content} !important;
+        position: absolute !important;
+        {toggle_accent_side}
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+        pointer-events: none !important;
+        opacity: 0.92 !important;
+        z-index: 1 !important;
+        user-select: none !important;
+    }}
+    /* Sliding Circle Knob (Sun disk in Day, Moon sphere in Night) */
+    div.st-key-theme_toggle_btn button::before {{
+        content: {toggle_knob_content} !important;
+        position: absolute !important;
+        left: 4px !important;
+        top: 50% !important;
+        margin-top: -15px !important;
+        width: 30px !important;
+        height: 30px !important;
+        border-radius: 50% !important;
+        background: {toggle_knob_bg} !important;
+        box-shadow: {toggle_knob_shadow} !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 15px !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        padding: 0 !important;
+        pointer-events: none !important;
+        z-index: 3 !important;
+        user-select: none !important;
+        animation: {toggle_animation} !important;
+        transform: {toggle_knob_transform} !important;
+        transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease !important;
     }}
     /* Hide button text and internal containers inside toggle */
     div.st-key-theme_toggle_btn button *,
@@ -1209,14 +1417,84 @@ def inject_brainwave_theme(is_dark: bool = False):
         -webkit-text-fill-color: {popover_btn_hover_text} !important;
     }}
 
-    /* Popover Content Card */
+    /* Popover Content Card & Child Text Overrides (Absolute Readability) */
     div[data-testid="stPopoverBody"] {{
         background: {card_bg} !important;
+        background-color: {card_bg} !important;
         border-radius: 22px !important;
         border: 1px solid {card_border} !important;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25) !important;
-        backdrop-filter: blur(24px) !important;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
+        backdrop-filter: blur(28px) !important;
+        -webkit-backdrop-filter: blur(28px) !important;
         padding: 1.4rem !important;
+        color: {text_body} !important;
+    }}
+    div[data-testid="stPopoverBody"] * {{
+        color: {text_body} !important;
+    }}
+    div[data-testid="stPopoverBody"] h1,
+    div[data-testid="stPopoverBody"] h2,
+    div[data-testid="stPopoverBody"] h3,
+    div[data-testid="stPopoverBody"] h4,
+    div[data-testid="stPopoverBody"] h5,
+    div[data-testid="stPopoverBody"] h6,
+    div[data-testid="stPopoverBody"] strong,
+    div[data-testid="stPopoverBody"] b {{
+        color: {text_hero} !important;
+    }}
+    div[data-testid="stPopoverBody"] p,
+    div[data-testid="stPopoverBody"] li,
+    div[data-testid="stPopoverBody"] span,
+    div[data-testid="stPopoverBody"] div {{
+        color: {text_body} !important;
+    }}
+    div[data-testid="stPopoverBody"] code {{
+        background: {code_bg} !important;
+        color: {code_color} !important;
+        border: 1px solid {code_border} !important;
+        border-radius: 6px !important;
+        padding: 2px 6px !important;
+        font-weight: 600 !important;
+    }}
+    div[data-testid="stPopoverBody"] .stCaption,
+    div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"],
+    div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] p,
+    div[data-testid="stPopoverBody"] small {{
+        color: {text_sub} !important;
+    }}
+
+    /* Universal Tables & DataFrames */
+    div[data-testid="stTable"] table,
+    .stTable table,
+    table {{
+        background-color: {table_cell_bg} !important;
+        border: 1px solid {table_border} !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        width: 100% !important;
+    }}
+    div[data-testid="stTable"] th,
+    .stTable th,
+    th {{
+        background-color: {table_header_bg} !important;
+        color: {table_header_text} !important;
+        font-weight: 700 !important;
+        border-bottom: 1px solid {table_border} !important;
+        padding: 10px 14px !important;
+        font-size: 0.88rem !important;
+    }}
+    div[data-testid="stTable"] td,
+    .stTable td,
+    td {{
+        background-color: {table_cell_bg} !important;
+        color: {table_cell_text} !important;
+        border-bottom: 1px solid {table_border} !important;
+        padding: 10px 14px !important;
+        font-size: 0.88rem !important;
+    }}
+    div[data-testid="stTable"] tr:last-child td,
+    table tr:last-child td {{
+        border-bottom: none !important;
     }}
 
     /* Footer */
@@ -1226,7 +1504,7 @@ def inject_brainwave_theme(is_dark: bool = False):
         font-size: 0.82rem;
         margin-top: 3.5rem;
         padding-top: 1.5rem;
-        border-top: 1px solid rgba(226, 232, 240, 0.6);
+        border-top: 1px solid {card_border};
         line-height: 1.6;
     }}
     </style>
@@ -1260,6 +1538,10 @@ def main():
 
     # Inject the BrainWave theme stylesheet
     inject_brainwave_theme(is_dark=is_dark)
+
+    render_html('<div class="sr-only-title">')
+    st.title("BrainWave: Explainable Brain Tumor Diagnosis System")
+    render_html('</div>')
 
     render_html("""
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1574,7 +1856,7 @@ def main():
                         <div class="metric-bento-card">
                             <div class="metric-bento-label">Diagnosis Category</div>
                             <div class="metric-bento-val">{pred_class.capitalize()}</div>
-                            <div style="font-size: 0.95rem; color: #64748b; margin-top: 4px;">
+                            <div class="metric-sub-detail" style="margin-top: 4px;">
                                 Model Confidence: <b>{confidence:.2f}%</b>
                             </div>
                         </div>
@@ -1763,7 +2045,7 @@ def main():
                         <div class="metric-bento-card">
                             <div class="metric-bento-label">Predicted Tumor Grade</div>
                             <div class="metric-bento-val">{pred_grade}</div>
-                            <div style="font-size: 0.95rem; color: #64748b; margin-top: 4px;">
+                            <div class="metric-sub-detail" style="margin-top: 4px;">
                                 Model Confidence: <b>{confidence:.2f}%</b>
                             </div>
                         </div>
@@ -1831,11 +2113,11 @@ def main():
                         <span style="font-size: 1.25rem; font-weight: 800;">1. Swin-Tiny Triage Model</span>
                         <span class="mode-bento-badge">Single-Modality</span>
                     </div>
-                    <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5;">
+                    <p style="font-size: 0.9rem; line-height: 1.5;">
                         Specialized for rapid first-line 4-class differential diagnosis from conventional 2D axial MRI scans.
                     </p>
-                    <hr style="border: 0; border-top: 1px solid rgba(226, 232, 240, 0.8); margin: 1rem 0;" />
-                    <ul style="font-size: 0.88rem; color: #334155; line-height: 1.7; padding-left: 1.2rem;">
+                    <hr />
+                    <ul style="font-size: 0.88rem; line-height: 1.7; padding-left: 1.2rem;">
                         <li><b>Backbone:</b> <code>swin_tiny_patch4_window7_224</code></li>
                         <li><b>Total Parameters:</b> <code>27,518,244</code> (27.52M)</li>
                         <li><b>Input Representation:</b> Single 2D slice expanded to 3 RGB channels $[3, 224, 224]$</li>
@@ -1858,11 +2140,11 @@ def main():
                         <span style="font-size: 1.25rem; font-weight: 800;">2. Swin-Base Multi-Modal Engine</span>
                         <span class="mode-bento-badge">Early Fusion</span>
                     </div>
-                    <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5;">
+                    <p style="font-size: 0.9rem; line-height: 1.5;">
                         High-capacity 4-channel early-fusion architecture engineered for fine-grained histological grading of High vs Low Grade Gliomas.
                     </p>
-                    <hr style="border: 0; border-top: 1px solid rgba(226, 232, 240, 0.8); margin: 1rem 0;" />
-                    <ul style="font-size: 0.88rem; color: #334155; line-height: 1.7; padding-left: 1.2rem;">
+                    <hr />
+                    <ul style="font-size: 0.88rem; line-height: 1.7; padding-left: 1.2rem;">
                         <li><b>Backbone:</b> <code>swin_base_patch4_window7_224</code></li>
                         <li><b>Total Parameters:</b> <code>86,746,478</code> (86.75M)</li>
                         <li><b>Input Representation:</b> 4-Channel early-fusion tensor $[4, 224, 224]$ ($T_1, T_{1ce}, T_2, FLAIR$)</li>
@@ -1904,7 +2186,7 @@ def main():
                 <div class="metric-bento-card">
                     <div class="metric-bento-label">Kaggle Triage Accuracy</div>
                     <div class="metric-bento-val">87.75%</div>
-                    <div style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">Macro F1: 0.8751</div>
+                    <div class="kpi-sub-text">Macro F1: 0.8751</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1915,7 +2197,7 @@ def main():
                 <div class="metric-bento-card">
                     <div class="metric-bento-label">Kaggle OvR ROC-AUC</div>
                     <div class="metric-bento-val">0.9759</div>
-                    <div style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">1,600 Held-Out Slices</div>
+                    <div class="kpi-sub-text">1,600 Held-Out Slices</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1926,7 +2208,7 @@ def main():
                 <div class="metric-bento-card">
                     <div class="metric-bento-label">BraTS Fusion Accuracy</div>
                     <div class="metric-bento-val">86.73%</div>
-                    <div style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">HGG F1: 0.9120</div>
+                    <div class="kpi-sub-text">HGG F1: 0.9120</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1937,7 +2219,7 @@ def main():
                 <div class="metric-bento-card">
                     <div class="metric-bento-label">Minority LGG Sensitivity</div>
                     <div class="metric-bento-val">94.64%</div>
-                    <div style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">Rescued from 0.00% Collapse</div>
+                    <div class="kpi-sub-text">Rescued from 0.00% Collapse</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1961,7 +2243,7 @@ def main():
                 """
                 <div class="metric-bento-card" style="border-left: 4px solid #ef4444;">
                     <b style="color: #ef4444; font-size: 1.1rem;">❌ Baseline (Unweighted Collapse)</b>
-                    <ul style="font-size: 0.85rem; color: #475569; margin-top: 0.5rem; line-height: 1.6;">
+                    <ul style="font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;">
                         <li>Standard Empirical Risk Cross-Entropy</li>
                         <li>Deceptive Accuracy: <b>80.95%</b></li>
                         <li>LGG Sensitivity: <b>0.00% (0 / 112 detected)</b></li>
@@ -1977,7 +2259,7 @@ def main():
                 """
                 <div class="metric-bento-card" style="border-left: 4px solid #22c55e;">
                     <b style="color: #22c55e; font-size: 1.1rem;">✅ Mitigated Swin-Base Pipeline</b>
-                    <ul style="font-size: 0.85rem; color: #475569; margin-top: 0.5rem; line-height: 1.6;">
+                    <ul style="font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;">
                         <li>Inverse-frequency class weights ($w_{\\text{LGG}}=2.45, w_{\\text{HGG}}=0.628$)</li>
                         <li>Balanced 50/50 mini-batches via <code>WeightedRandomSampler</code></li>
                         <li>True Discriminative Accuracy: <b>86.73%</b></li>
@@ -2031,15 +2313,15 @@ def main():
             st.markdown(
                 """
                 <div class="metric-bento-card" style="margin-bottom: 1.2rem;">
-                    <b style="font-size: 1.1rem; color: #4f46e5;">Channel 0: T1-Weighted (T1 Native)</b>
-                    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-top: 4px;">
+                    <b class="metric-channel-title">Channel 0: T1-Weighted (T1 Native)</b>
+                    <p style="font-size: 0.88rem; line-height: 1.5; margin-top: 4px;">
                         Highlights anatomical architecture and tissue boundaries. Cerebrospinal fluid appears dark (hypointense), 
                         gray matter intermediate, and white matter bright. Critical for baseline anatomical registration.
                     </p>
                 </div>
                 <div class="metric-bento-card">
-                    <b style="font-size: 1.1rem; color: #4f46e5;">Channel 1: T1-Contrast Enhanced (T1ce / Gadolinium)</b>
-                    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-top: 4px;">
+                    <b class="metric-channel-title">Channel 1: T1-Contrast Enhanced (T1ce / Gadolinium)</b>
+                    <p style="font-size: 0.88rem; line-height: 1.5; margin-top: 4px;">
                         Gadolinium contrast leaks across the disrupted blood-brain barrier. Highlights vascularized active tumor rims 
                         and necrotic cavities. Decisive for identifying high-grade glioblastoma angiogenesis.
                     </p>
@@ -2051,15 +2333,15 @@ def main():
             st.markdown(
                 """
                 <div class="metric-bento-card" style="margin-bottom: 1.2rem;">
-                    <b style="font-size: 1.1rem; color: #4f46e5;">Channel 2: T2-Weighted (T2 Spin-Echo)</b>
-                    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-top: 4px;">
+                    <b class="metric-channel-title">Channel 2: T2-Weighted (T2 Spin-Echo)</b>
+                    <p style="font-size: 0.88rem; line-height: 1.5; margin-top: 4px;">
                         Free water and fluid display bright hyperintense signal. Highlights diffuse infiltrative edema, 
                         cysts, and cellular water changes throughout the parenchyma.
                     </p>
                 </div>
                 <div class="metric-bento-card">
-                    <b style="font-size: 1.1rem; color: #4f46e5;">Channel 3: T2-FLAIR (Fluid-Attenuated Inversion Recovery)</b>
-                    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-top: 4px;">
+                    <b class="metric-channel-title">Channel 3: T2-FLAIR (Fluid-Attenuated Inversion Recovery)</b>
+                    <p style="font-size: 0.88rem; line-height: 1.5; margin-top: 4px;">
                         Inversion recovery pulse selectively nulls the signal from free ventricular cerebrospinal fluid (CSF). 
                         Vasogenic edema surrounding the lesion remains intensely bright, making FLAIR the ideal anatomical baseline 
                         for heatmaps and explainability overlays.
