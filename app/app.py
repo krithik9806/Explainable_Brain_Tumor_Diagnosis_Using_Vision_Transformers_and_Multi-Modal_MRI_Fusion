@@ -23,6 +23,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import torch
 
 # Global cached hardware device detection for instant reruns without CUDA polling lag
@@ -328,6 +329,8 @@ def inject_brainwave_theme(is_dark: bool = False):
         table_cell_text = "#f1f5f9"
         table_border = "rgba(255, 255, 255, 0.14)"
         green_accent = "#4ade80"
+        spotlight_bg = "radial-gradient(circle, rgba(129, 140, 248, 0.30) 0%, rgba(99, 102, 241, 0.16) 28%, rgba(168, 85, 247, 0.06) 50%, transparent 70%)"
+        spotlight_blend = "screen"
         # Sliding Theme Switcher Variables (Night Mode)
         toggle_track_bg = "linear-gradient(135deg, #1e1b4b 0%, #2e1065 55%, #0f172a 100%)"
         toggle_track_border = "rgba(168, 85, 247, 0.7)"
@@ -391,6 +394,8 @@ def inject_brainwave_theme(is_dark: bool = False):
         table_cell_text = "#334155"
         table_border = "rgba(226, 232, 240, 0.9)"
         green_accent = "#16a34a"
+        spotlight_bg = "radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(124, 58, 237, 0.08) 28%, rgba(56, 189, 248, 0.03) 50%, transparent 70%)"
+        spotlight_blend = "multiply"
         # Sliding Theme Switcher Variables (Day Mode)
         toggle_track_bg = "linear-gradient(135deg, #38bdf8 0%, #818cf8 100%)"
         toggle_track_border = "rgba(255, 255, 255, 0.95)"
@@ -1497,6 +1502,41 @@ def inject_brainwave_theme(is_dark: bool = False):
         border-bottom: none !important;
     }}
 
+    /* Realistic Zero-Lag Cursor Spotlight */
+    #bw-cursor-spotlight {{
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 440px !important;
+        height: 440px !important;
+        margin-left: -220px !important;
+        margin-top: -220px !important;
+        border-radius: 50% !important;
+        pointer-events: none !important;
+        z-index: 9999999 !important;
+        opacity: 0;
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        background: {spotlight_bg} !important;
+        mix-blend-mode: {spotlight_blend} !important;
+        will-change: transform !important;
+        transform: translate3d(-1000px, -1000px, 0);
+    }}
+
+    /* Zero-footprint iframe hide for helper components */
+    iframe[title="streamlit_components_html"],
+    div:has(> iframe[title="streamlit_components_html"]),
+    [data-testid="stCustomComponentV1"] {{
+        position: absolute !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        border: none !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none !important;
+    }}
+
     /* Footer */
     .bw-footer {{
         text-align: center;
@@ -1510,6 +1550,56 @@ def inject_brainwave_theme(is_dark: bool = False):
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+
+    # Zero-lag hardware-accelerated cursor spotlight injection
+    components.html(
+        """
+        <script>
+        (function() {
+            try {
+                const parentDoc = window.parent.document;
+                if (!parentDoc) return;
+                
+                // Ensure spotlight container exists in the main application DOM
+                let spotlight = parentDoc.getElementById('bw-cursor-spotlight');
+                if (!spotlight) {
+                    spotlight = parentDoc.createElement('div');
+                    spotlight.id = 'bw-cursor-spotlight';
+                    parentDoc.body.appendChild(spotlight);
+                }
+
+                // Attach listener once to parent window
+                if (!window.parent.__bwSpotlightActive) {
+                    window.parent.__bwSpotlightActive = true;
+                    
+                    const updateSpotlight = (e) => {
+                        const spot = parentDoc.getElementById('bw-cursor-spotlight');
+                        if (!spot) return;
+                        spot.style.opacity = '1';
+                        spot.style.transform = 'translate3d(' + e.clientX + 'px, ' + e.clientY + 'px, 0)';
+                    };
+
+                    const hideSpotlight = () => {
+                        const spot = parentDoc.getElementById('bw-cursor-spotlight');
+                        if (spot) spot.style.opacity = '0';
+                    };
+
+                    parentDoc.addEventListener('pointermove', updateSpotlight, { passive: true });
+                    parentDoc.addEventListener('mouseleave', hideSpotlight, { passive: true });
+                    parentDoc.addEventListener('mouseenter', () => {
+                        const spot = parentDoc.getElementById('bw-cursor-spotlight');
+                        if (spot) spot.style.opacity = '1';
+                    }, { passive: true });
+                }
+            } catch (err) {
+                console.debug('Spotlight listener init:', err);
+            }
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 
 # ==============================================================================
