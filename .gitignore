@@ -29,3 +29,6 @@ Thumbs.db
 
 # Large dataset archive - stored separately as a GitHub Release asset
 brats_slices.zip
+
+# Sample testing image sets
+data/sample_multimodal_sets/
